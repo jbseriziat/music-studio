@@ -7,6 +7,7 @@ export const CATEGORIES = [
   { id: 'instruments', label: 'Instruments', emoji: '🎸' },
   { id: 'melodies',    label: 'Mélodies',    emoji: '🎵' },
   { id: 'fun',         label: 'Fun',         emoji: '🐱' },
+  { id: 'favorites',   label: 'Favoris',     emoji: '⭐' },
 ] as const;
 
 interface Props {

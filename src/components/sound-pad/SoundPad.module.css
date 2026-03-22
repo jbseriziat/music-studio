@@ -48,6 +48,14 @@
   100% { transform: scale(1.0);  filter: brightness(1.0); }
 }
 
+/* État drag-over : indique qu'on peut déposer un sample */
+.dragOver {
+  outline: 3px dashed rgba(255, 255, 255, 0.8);
+  outline-offset: -4px;
+  filter: brightness(1.2);
+  transform: scale(1.04);
+}
+
 /* Icône / emoji centrale — 32px comme demandé */
 .icon {
   font-size: 32px;

@@ -14,7 +14,9 @@ interface Props {
 
 export function SoundPad({ id, color, textColor = '#fff', icon, sampleName, sampleId }: Props) {
   const [isTriggered, setIsTriggered] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const triggerPad = usePadsStore((s) => s.triggerPad);
+  const assignPadSample = usePadsStore((s) => s.assignPadSample);
 
   const handleClick = useCallback(async () => {
     if (sampleId === null) return;
@@ -34,22 +36,53 @@ export function SoundPad({ id, color, textColor = '#fff', icon, sampleName, samp
     e.dataTransfer.effectAllowed = 'copy';
   }, [sampleId, sampleName]);
 
+  /** Accepter les drops de samples depuis le SampleBrowser. */
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('application/json')) as {
+        type: string;
+        sampleId?: number;
+        sampleName?: string;
+      };
+      if (data.type === 'sample' && typeof data.sampleId === 'number') {
+        assignPadSample(id, data.sampleId, data.sampleName ?? `Sample ${data.sampleId}`);
+      }
+    } catch {
+      // Données drag invalides — ignorer silencieusement
+    }
+  }, [id, assignPadSample]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    // TODO: ouvrir le Sample Browser pour réassigner (prompt 1.5)
-    console.log('menu contextuel pad', id);
+    // TODO: ouvrir une modale de réassignation (prompt 1.7+)
+    console.log('[SoundPad] context menu — pad', id);
   }, [id]);
 
   return (
     <button
-      className={`${styles.pad} ${isTriggered ? styles.triggered : ''}`}
+      className={`${styles.pad} ${isTriggered ? styles.triggered : ''} ${isDragOver ? styles.dragOver : ''}`}
       style={{ '--pad-color': color, '--text-color': textColor } as React.CSSProperties}
       onClick={handleClick}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       onContextMenu={handleContextMenu}
       draggable={sampleId !== null}
-      title={sampleName || 'Pas de son'}
-      aria-label={`Pad ${id + 1}: ${sampleName}`}
+      title={sampleName || 'Glisser un son ici'}
+      aria-label={`Pad ${id + 1}: ${sampleName || 'vide'}`}
     >
       <span className={styles.icon}>{icon}</span>
       <span className={styles.name}>{sampleName || '—'}</span>

@@ -1,10 +1,11 @@
 import { useCallback } from 'react';
 import type { SampleInfo } from '../../utils/tauri-commands';
-import { previewSample } from '../../utils/tauri-commands';
+import { SamplePreview } from './SamplePreview';
 import styles from './SampleList.module.css';
 
 interface Props {
   samples: SampleInfo[];
+  isLoading?: boolean;
 }
 
 function formatDuration(ms: number): string {
@@ -12,16 +13,48 @@ function formatDuration(ms: number): string {
   return s < 1 ? `${ms}ms` : `${s.toFixed(1)}s`;
 }
 
-export function SampleList({ samples }: Props) {
-  const handlePreview = useCallback(async (e: React.MouseEvent, id: number) => {
-    e.stopPropagation();
-    try {
-      await previewSample(id);
-    } catch (err) {
-      console.error('[SampleList] preview error', err);
-    }
-  }, []);
+/** Mini waveform en SVG (26 barres représentant les 128 points de crête). */
+function MiniWaveform({ data }: { data: number[] }) {
+  if (!data || data.length === 0) return null;
 
+  const W = 52;
+  const H = 18;
+  const barCount = 26;
+  const barW = W / barCount;
+
+  return (
+    <svg
+      width={W}
+      height={H}
+      viewBox={`0 0 ${W} ${H}`}
+      className={styles.waveform}
+      aria-hidden="true"
+    >
+      {Array.from({ length: barCount }, (_, i) => {
+        // Downsample : max peak sur la plage correspondante
+        const start = Math.floor((i / barCount) * data.length);
+        const end = Math.floor(((i + 1) / barCount) * data.length);
+        let peak = 0;
+        for (let j = start; j < end; j++) {
+          peak = Math.max(peak, data[j] ?? 0);
+        }
+        const barH = Math.max(2, peak * (H - 2));
+        return (
+          <rect
+            key={i}
+            x={i * barW}
+            y={(H - barH) / 2}
+            width={Math.max(1, barW - 1)}
+            height={barH}
+            rx={1}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+export function SampleList({ samples, isLoading = false }: Props) {
   const handleDragStart = useCallback((e: React.DragEvent, sample: SampleInfo) => {
     e.dataTransfer.setData(
       'application/json',
@@ -29,6 +62,7 @@ export function SampleList({ samples }: Props) {
         type: 'sample',
         sampleId: sample.id,
         sampleName: sample.name,
+        samplePath: sample.path,
         durationMs: sample.duration_ms,
         waveform: sample.waveform,
       })
@@ -36,8 +70,12 @@ export function SampleList({ samples }: Props) {
     e.dataTransfer.effectAllowed = 'copy';
   }, []);
 
-  if (samples.length === 0) {
+  if (isLoading) {
     return <div className={styles.empty}>Chargement…</div>;
+  }
+
+  if (samples.length === 0) {
+    return <div className={styles.empty}>Aucun son dans cette catégorie.</div>;
   }
 
   return (
@@ -48,17 +86,16 @@ export function SampleList({ samples }: Props) {
           className={styles.item}
           draggable
           onDragStart={e => handleDragStart(e, sample)}
+          title={`Glisser pour assigner — ${sample.name}`}
         >
-          <span className={styles.name}>{sample.name}</span>
-          <span className={styles.duration}>{formatDuration(sample.duration_ms)}</span>
-          <button
-            className={styles.playBtn}
-            onClick={e => handlePreview(e, sample.id)}
-            title="Prévisualiser"
-            aria-label={`Écouter ${sample.name}`}
-          >
-            ▶
-          </button>
+          <div className={styles.itemMain}>
+            <span className={styles.name}>{sample.name}</span>
+            <span className={styles.duration}>{formatDuration(sample.duration_ms)}</span>
+          </div>
+          {sample.waveform && sample.waveform.length > 0 && (
+            <MiniWaveform data={sample.waveform} />
+          )}
+          <SamplePreview sampleId={sample.id} sampleName={sample.name} />
         </div>
       ))}
     </div>
