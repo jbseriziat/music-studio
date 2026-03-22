@@ -1,0 +1,223 @@
+/* ── Bouton déclencheur ── */
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  max-width: 200px;
+  text-align: left;
+}
+.trigger:hover { background: var(--bg-overlay); border-color: var(--border-strong); }
+
+.avatar { font-size: 22px; line-height: 1; flex-shrink: 0; }
+
+.info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.level {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chevron {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+/* ── Menu dropdown ── */
+.menu {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 6px;
+  min-width: 220px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  animation: menuIn 0.15s ease;
+  z-index: 200;
+}
+
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.menuLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 6px 10px 4px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.1s;
+}
+.menuItem:hover,
+.menuItem[data-highlighted] { background: var(--bg-elevated); }
+
+.menuItemActive { background: var(--bg-overlay); }
+
+.menuAvatar { font-size: 22px; line-height: 1; flex-shrink: 0; }
+
+.menuItemText {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.menuName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.menuLevel {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.activeCheck {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--accent);
+}
+
+.separator {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.menuItemManage {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* ── Dialog code parent ── */
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  z-index: 300;
+}
+
+.dialogContent {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px 32px;
+  width: 360px;
+  max-width: 95vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  z-index: 301;
+  animation: slideUp 0.18s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translate(-50%, -46%); }
+  to   { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+.dialogTitle {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin: 0 0 10px;
+}
+
+.dialogDesc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.codeInput {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 600;
+  outline: none;
+  box-sizing: border-box;
+  letter-spacing: 4px;
+  transition: border-color 0.15s;
+}
+.codeInput:focus { border-color: var(--accent); }
+
+.codeError {
+  color: #F44336;
+  font-size: 13px;
+  font-weight: 700;
+  margin: 8px 0 0;
+}
+
+.dialogActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.dialogCancelBtn {
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.dialogCancelBtn:hover { background: var(--bg-elevated); }
+
+.dialogConfirmBtn {
+  padding: 10px 22px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.dialogConfirmBtn:hover { opacity: 0.85; }

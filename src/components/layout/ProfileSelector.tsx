@@ -4,18 +4,29 @@ import { LEVEL_CONFIGS } from '../../types/levels';
 import { ProfileCreator } from './ProfileCreator';
 import styles from './ProfileSelector.module.css';
 
-export function ProfileSelector() {
-  const { profiles, activeProfileId, switchProfile } = useSettingsStore();
+interface Props {
+  /** Si true, s'affiche en plein écran (au démarrage). Si false, s'affiche en overlay gérable. */
+  fullscreen?: boolean;
+  onClose?: () => void;
+}
+
+export function ProfileSelector({ fullscreen = true, onClose }: Props) {
+  const { profiles, switchProfile } = useSettingsStore();
   const [showCreator, setShowCreator] = useState(false);
 
-  // Masquer si un profil est déjà actif
-  if (activeProfileId !== null) return null;
+  const handleSelect = (id: string) => {
+    switchProfile(id);
+    onClose?.();
+  };
 
   return (
-    <div className={styles.screen}>
+    <div className={`${styles.screen} ${fullscreen ? styles.fullscreen : ''}`}>
       <div className={styles.inner}>
-        <h1 className={styles.title}>🎵 Music Studio</h1>
-        <p className={styles.subtitle}>Choisis ton profil</p>
+        <div className={styles.titleBlock}>
+          <span className={styles.titleEmoji}>🎵</span>
+          <h1 className={styles.title}>Qui joue aujourd'hui ?</h1>
+          <p className={styles.subtitle}>Choisis ton profil pour commencer</p>
+        </div>
 
         <div className={styles.grid}>
           {profiles.map(profile => {
@@ -24,11 +35,12 @@ export function ProfileSelector() {
               <button
                 key={profile.id}
                 className={styles.card}
-                onClick={() => switchProfile(profile.id)}
+                style={{ '--level-color': cfg?.color } as React.CSSProperties}
+                onClick={() => handleSelect(profile.id)}
               >
                 <span className={styles.avatar}>{profile.avatar}</span>
                 <span className={styles.name}>{profile.name}</span>
-                <span className={styles.level} style={{ color: cfg?.color }}>
+                <span className={styles.levelBadge} style={{ background: cfg?.color }}>
                   {cfg?.icon} {cfg?.label}
                 </span>
               </button>
@@ -44,9 +56,15 @@ export function ProfileSelector() {
             <span className={styles.name}>Nouveau profil</span>
           </button>
         </div>
+
+        {onClose && (
+          <button className={styles.closeBtn} onClick={onClose}>✕ Fermer</button>
+        )}
       </div>
 
-      {showCreator && <ProfileCreator onClose={() => setShowCreator(false)} />}
+      {showCreator && (
+        <ProfileCreator onClose={() => setShowCreator(false)} />
+      )}
     </div>
   );
 }

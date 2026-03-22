@@ -14,7 +14,7 @@ function App() {
   return (
     <>
       {/* Écran de sélection de profil si aucun profil actif */}
-      {!activeProfileId && <ProfileSelector />}
+      {!activeProfileId && <ProfileSelector fullscreen />}
 
       <AppShell sidebar={<SampleBrowser />}>
         <div className={styles.mainLayout}>
