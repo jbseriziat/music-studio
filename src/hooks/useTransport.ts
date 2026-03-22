@@ -1,64 +1,25 @@
 import { useCallback, useEffect } from 'react';
 import { useTransportStore } from '../stores/transportStore';
-import {
-  playAudio,
-  pauseAudio,
-  stopAudio,
-  setMasterVolume,
-  getPosition,
-  setPositionCmd,
-} from '../utils/tauri-commands';
+import { setMasterVolume, setPositionCmd } from '../utils/tauri-commands';
 
 /**
  * Hook centralisant le contrôle du transport.
- * Synchronise le store Zustand avec les commandes Rust.
- * Poll la position toutes les 50ms pendant la lecture.
+ * Délègue play/pause/stop au transportStore (qui gère l'IPC).
+ * Poll la position toutes les 50ms pendant la lecture via store.syncPosition().
  */
 export function useTransport() {
   const store = useTransportStore();
 
-  // Polling de la position pendant la lecture.
+  // Polling de la position pendant la lecture (50ms).
   useEffect(() => {
     if (!store.isPlaying) return;
-    const interval = setInterval(async () => {
-      try {
-        const pos = await getPosition();
-        store.setPosition(pos);
-      } catch {
-        // Ignorer les erreurs de polling
-      }
+    const interval = setInterval(() => {
+      store.syncPosition();
     }, 50);
     return () => clearInterval(interval);
-  }, [store.isPlaying, store]);
+  }, [store.isPlaying, store.syncPosition]);
 
-  const play = useCallback(async () => {
-    try {
-      await playAudio();
-      store.setPlaying(true);
-    } catch (e) {
-      console.error('[Transport] play error', e);
-    }
-  }, [store]);
-
-  const pause = useCallback(async () => {
-    try {
-      await pauseAudio();
-      store.setPlaying(false);
-    } catch (e) {
-      console.error('[Transport] pause error', e);
-    }
-  }, [store]);
-
-  const stop = useCallback(async () => {
-    try {
-      await stopAudio();
-      store.setPlaying(false);
-      store.setPosition(0);
-    } catch (e) {
-      console.error('[Transport] stop error', e);
-    }
-  }, [store]);
-
+  /** Repositionne le curseur à une position en secondes. */
   const seekTo = useCallback(async (secs: number) => {
     try {
       await setPositionCmd(secs);
@@ -68,25 +29,39 @@ export function useTransport() {
     }
   }, [store]);
 
+  /** Met à jour le BPM dans le store (IPC Phase 2+). */
   const setBpm = useCallback((bpm: number) => {
     store.setBpm(bpm);
     // TODO Phase 2 : invoke('set_bpm', { bpm })
   }, [store]);
 
+  /** Ajuste le volume master via IPC. */
   const setVolume = useCallback(async (volume: number) => {
     await setMasterVolume(volume);
   }, []);
 
+  /** Bascule l'état d'enregistrement (IPC Phase 4+). */
+  const toggleRecording = useCallback(() => {
+    store.setRecording(!store.isRecording);
+    // TODO Phase 4 : invoke('arm_track', ...) + recording logic
+  }, [store]);
+
   return {
     isPlaying: store.isPlaying,
+    isRecording: store.isRecording,
     position: store.position,
     bpm: store.bpm,
     loopEnabled: store.loopEnabled,
-    play,
-    pause,
-    stop,
+    metronomeEnabled: store.metronomeEnabled,
+    // Actions IPC (déléguées au store)
+    play: store.play,
+    pause: store.pause,
+    stop: store.stop,
+    // Actions locales
     seekTo,
     setBpm,
     setVolume,
+    toggleRecording,
+    toggleMetronome: store.toggleMetronome,
   };
 }

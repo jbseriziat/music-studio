@@ -1,0 +1,31 @@
+.btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s, background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.45);
+  transform: scale(1.05);
+}
+
+.btn:active {
+  transform: scale(0.95);
+}
+
+.btn.active {
+  background: rgba(33, 150, 243, 0.25);
+  border-color: #2196F3;
+  color: #64B5F6;
+}
