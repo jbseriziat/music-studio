@@ -1,6 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import { Clip } from './Clip';
-import { addClipCmd } from '../../utils/tauri-commands';
+import { addClipCmd, moveClipCmd } from '../../utils/tauri-commands';
 import { useTracksStore } from '../../stores/tracksStore';
 import styles from './Track.module.css';
 
@@ -86,10 +86,22 @@ export function Track({ id, name, color, clips, pixelsPerSec, selectedClipId, on
       if (!draggingRef.current) return;
       const delta = (e.clientX - draggingRef.current.startX) / pixelsPerSec;
       const newPos = Math.max(0, snapToGrid(draggingRef.current.startPos + delta, SNAP_GRID));
-      const { clipId } = draggingRef.current;
+      const { clipId: cId } = draggingRef.current;
       draggingRef.current = null;
       document.removeEventListener('mouseup', onMouseUp);
-      moveClip(clipId, id, newPos);
+
+      // Mettre à jour le store frontend.
+      moveClip(cId, id, newPos);
+
+      // Synchroniser le déplacement avec le moteur audio.
+      const match = cId.match(/\d+/);
+      if (match) {
+        try {
+          await moveClipCmd(Number(match[0]), newPos);
+        } catch {
+          // Le clip peut ne pas exister dans le moteur audio, ignorer.
+        }
+      }
     };
 
     document.addEventListener('mouseup', onMouseUp);
