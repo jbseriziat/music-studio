@@ -15,6 +15,8 @@ interface TracksState {
   moveClip: (clipId: string, newTrackId: string, newPosition: number) => void;
   selectClip: (id: string | null) => void;
   selectTrack: (id: string | null) => void;
+  /** Remplace entièrement le state pistes+clips (utilisé au chargement de projet). */
+  restoreState: (tracks: Track[], clips: Clip[]) => void;
 }
 
 const TRACK_COLORS = ['#FF5722', '#2196F3', '#4CAF50', '#9C27B0', '#FF9800', '#00BCD4'];
@@ -60,4 +62,7 @@ export const useTracksStore = create<TracksState>()((set) => ({
 
   selectClip: (selectedClipId) => set({ selectedClipId }),
   selectTrack: (selectedTrackId) => set({ selectedTrackId }),
+
+  restoreState: (tracks, clips) =>
+    set({ tracks, clips, selectedClipId: null, selectedTrackId: null }),
 }));

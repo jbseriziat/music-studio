@@ -175,6 +175,14 @@ impl AudioCallbackState {
                 self.clips.retain(|c| c.id != id);
                 self.clip_voices.retain(|(cid, _)| *cid != id);
             }
+            AudioCommand::ClearTimeline => {
+                self.clips.clear();
+                self.clip_voices.clear();
+                self.position_frames = 0;
+                self.is_playing = false;
+                self.is_playing_atomic.store(false, Ordering::Relaxed);
+                self.position_atomic.store(0, Ordering::Relaxed);
+            }
         }
     }
 }

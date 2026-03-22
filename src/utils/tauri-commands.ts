@@ -11,6 +11,13 @@ export interface ProjectInfo {
   path: string;
 }
 
+export interface ProjectSummary {
+  name: string;
+  path: string;
+  modified_at: number;  // Unix timestamp en secondes
+  bpm: number;
+}
+
 export interface SampleInfo {
   id: number;
   name: string;
@@ -94,6 +101,9 @@ export const moveClipCmd = (clipId: number, newPositionSecs: number): Promise<vo
 export const deleteClipCmd = (clipId: number): Promise<void> =>
   invoke<void>('delete_clip', { clipId });
 
+export const clearTimeline = (): Promise<void> =>
+  invoke<void>('clear_timeline');
+
 // ─── Pads & samples ───────────────────────────────────────────────────────────
 
 export const triggerPad = (padId: number): Promise<void> =>
@@ -141,3 +151,15 @@ export const saveProject = (path: string, project: MspProject): Promise<void> =>
 
 export const loadProject = (path: string): Promise<MspProject> =>
   invoke<MspProject>('load_project', { path });
+
+export const listProjects = (): Promise<ProjectSummary[]> =>
+  invoke<ProjectSummary[]>('list_projects');
+
+export const getProjectsDir = (): Promise<string> =>
+  invoke<string>('get_projects_dir');
+
+export const getProjectPath = (name: string): Promise<string> =>
+  invoke<string>('get_project_path', { name });
+
+export const deleteProjectFile = (path: string): Promise<void> =>
+  invoke<void>('delete_project', { path });

@@ -112,3 +112,10 @@ pub fn set_position(
     });
     Ok(())
 }
+
+/// Efface tous les clips de la timeline (nouveau projet / chargement).
+#[tauri::command]
+pub fn clear_timeline(engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(AudioCommand::ClearTimeline);
+    Ok(())
+}

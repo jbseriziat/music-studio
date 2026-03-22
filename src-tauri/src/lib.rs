@@ -15,9 +15,13 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 use commands::audio_commands::{
-    add_clip, delete_clip, move_clip, pause, ping_audio, play, set_master_volume, set_position, stop,
+    add_clip, clear_timeline, delete_clip, move_clip, pause, ping_audio, play, set_master_volume,
+    set_position, stop,
 };
-use commands::project_commands::{load_project, new_project, save_project};
+use commands::project_commands::{
+    delete_project, get_project_path, get_projects_dir, list_projects, load_project, new_project,
+    save_project,
+};
 use commands::sample_commands::{
     assign_pad_sample, get_pad_config, get_position, list_samples, load_sample, preview_sample,
     stop_preview, trigger_pad,
@@ -83,6 +87,7 @@ pub fn run() {
             add_clip,
             move_clip,
             delete_clip,
+            clear_timeline,
             // Samples & pads
             trigger_pad,
             assign_pad_sample,
@@ -100,6 +105,10 @@ pub fn run() {
             new_project,
             save_project,
             load_project,
+            list_projects,
+            get_projects_dir,
+            get_project_path,
+            delete_project,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
