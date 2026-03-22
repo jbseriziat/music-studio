@@ -19,8 +19,8 @@ use commands::audio_commands::{
 };
 use commands::project_commands::{load_project, new_project, save_project};
 use commands::sample_commands::{
-    assign_pad_sample, get_pad_config, get_position, list_samples, preview_sample, stop_preview,
-    trigger_pad,
+    assign_pad_sample, get_pad_config, get_position, list_samples, load_sample, preview_sample,
+    stop_preview, trigger_pad,
 };
 use commands::settings_commands::{get_audio_devices, get_profiles, save_profiles};
 
@@ -87,6 +87,7 @@ pub fn run() {
             trigger_pad,
             assign_pad_sample,
             list_samples,
+            load_sample,
             preview_sample,
             stop_preview,
             get_position,

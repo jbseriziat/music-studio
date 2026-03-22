@@ -114,6 +114,10 @@ export const stopPreview = (): Promise<void> =>
 export const getPadConfig = (): Promise<(number | null)[]> =>
   invoke<(number | null)[]>('get_pad_config');
 
+/** Charge un fichier WAV depuis un chemin absolu, l'ajoute à la banque et retourne ses infos. */
+export const loadSample = (path: string): Promise<SampleInfo> =>
+  invoke<SampleInfo>('load_sample', { path });
+
 // ─── Périphériques ────────────────────────────────────────────────────────────
 
 export const getAudioDevices = (): Promise<AudioDevice[]> =>

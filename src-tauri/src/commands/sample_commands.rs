@@ -1,6 +1,8 @@
 use crate::audio::commands::AudioCommand;
 use crate::audio::AudioEngine;
+use crate::sampler::sample_bank::{compute_waveform, load_wav};
 use crate::sampler::SampleInfo;
+use std::path::Path;
 use std::sync::Mutex;
 use tauri::State;
 
@@ -110,4 +112,62 @@ pub fn get_pad_config(
         .map(|i| bank.samples.get(i).map(|s| s.id))
         .collect();
     Ok(config)
+}
+
+/// Charge un fichier WAV arbitraire, l'ajoute à la banque et le notifie au thread audio.
+/// Utilisé pour importer des sons personnels (niveau 3+) ou pour des tests.
+/// Retourne un SampleInfo avec l'identifiant attribué et la waveform précalculée.
+#[tauri::command]
+pub fn load_sample(
+    path: String,
+    engine: State<Mutex<AudioEngine>>,
+    sample_bank: State<Mutex<crate::sampler::SampleBank>>,
+) -> Result<SampleInfo, String> {
+    let file_path = Path::new(&path);
+
+    // 1. Charger et traiter le fichier audio (hors verrou)
+    let (frames, channels, sample_rate) = load_wav(file_path)?;
+    let num_frames = frames.len() / channels as usize;
+    let duration_ms = ((num_frames as f64 / sample_rate as f64) * 1000.0) as u32;
+    let waveform = compute_waveform(&frames, channels, 128);
+    let name = file_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("sample")
+        .to_string();
+    let data = std::sync::Arc::new(frames);
+
+    // 2. Ajouter à la banque (verrou banque relâché avant d'accéder au moteur)
+    let (info, data_for_engine) = {
+        let mut bank = sample_bank.inner().lock().map_err(|e| e.to_string())?;
+
+        // L'ID = prochain index dans audio_data (IDs contigus depuis le chargement initial)
+        let new_id = bank.audio_data.len() as u32;
+        bank.audio_data.push((std::sync::Arc::clone(&data), channels, sample_rate));
+
+        let info = SampleInfo {
+            id: new_id,
+            name,
+            category: "imported".to_string(),
+            path,
+            duration_ms,
+            waveform,
+            tags: vec!["imported".to_string()],
+        };
+        bank.samples.push(info.clone());
+        (info, std::sync::Arc::clone(&data))
+    }; // verrou banque relâché ici
+
+    // 3. Notifier le thread audio pour qu'il puisse lire ce sample
+    {
+        let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+        eng.send_command(AudioCommand::LoadSample {
+            id: info.id,
+            data: data_for_engine,
+            channels,
+            sample_rate,
+        });
+    }
+
+    Ok(info)
 }
