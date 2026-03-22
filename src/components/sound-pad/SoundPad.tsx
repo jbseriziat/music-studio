@@ -1,30 +1,29 @@
 import React, { useState, useCallback } from 'react';
-import { triggerPad } from '../../utils/tauri-commands';
+import { usePadsStore } from '../../stores/padsStore';
 import styles from './SoundPad.module.css';
 
 interface Props {
   id: number;
   color: string;
-  emoji: string;
+  textColor?: string;
+  /** Emoji affiché au centre du pad. */
+  icon: string;
   sampleName: string;
   sampleId: number | null;
-  onDragStart?: (sampleId: number, sampleName: string) => void;
-  onAssignRequest?: (padId: number) => void;
 }
 
-export function SoundPad({ id, color, emoji, sampleName, sampleId, onDragStart, onAssignRequest }: Props) {
+export function SoundPad({ id, color, textColor = '#fff', icon, sampleName, sampleId }: Props) {
   const [isTriggered, setIsTriggered] = useState(false);
+  const triggerPad = usePadsStore((s) => s.triggerPad);
 
   const handleClick = useCallback(async () => {
     if (sampleId === null) return;
-    try {
-      await triggerPad(id);
-    } catch (e) {
-      console.error('[SoundPad] trigger error', e);
-    }
+    // Lancer l'IPC (fire-and-forget, l'animation est indépendante)
+    triggerPad(id);
+    // Animation pulse : scale 0.95 → 1.05 → 1.0 sur 150ms
     setIsTriggered(true);
-    setTimeout(() => setIsTriggered(false), 300);
-  }, [id, sampleId]);
+    setTimeout(() => setIsTriggered(false), 200);
+  }, [id, sampleId, triggerPad]);
 
   const handleDragStart = useCallback((e: React.DragEvent) => {
     if (sampleId === null) return;
@@ -33,18 +32,18 @@ export function SoundPad({ id, color, emoji, sampleName, sampleId, onDragStart, 
       JSON.stringify({ type: 'pad', sampleId, sampleName })
     );
     e.dataTransfer.effectAllowed = 'copy';
-    onDragStart?.(sampleId, sampleName);
-  }, [sampleId, sampleName, onDragStart]);
+  }, [sampleId, sampleName]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    onAssignRequest?.(id);
-  }, [id, onAssignRequest]);
+    // TODO: ouvrir le Sample Browser pour réassigner (prompt 1.5)
+    console.log('menu contextuel pad', id);
+  }, [id]);
 
   return (
     <button
       className={`${styles.pad} ${isTriggered ? styles.triggered : ''}`}
-      style={{ '--pad-color': color } as React.CSSProperties}
+      style={{ '--pad-color': color, '--text-color': textColor } as React.CSSProperties}
       onClick={handleClick}
       onDragStart={handleDragStart}
       onContextMenu={handleContextMenu}
@@ -52,7 +51,7 @@ export function SoundPad({ id, color, emoji, sampleName, sampleId, onDragStart, 
       title={sampleName || 'Pas de son'}
       aria-label={`Pad ${id + 1}: ${sampleName}`}
     >
-      <span className={styles.emoji}>{emoji}</span>
+      <span className={styles.icon}>{icon}</span>
       <span className={styles.name}>{sampleName || '—'}</span>
     </button>
   );
