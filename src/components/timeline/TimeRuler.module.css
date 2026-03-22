@@ -1,0 +1,38 @@
+.ruler {
+  position: relative;
+  height: 28px;
+  background: var(--color-surface-elevated);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+  min-width: 100%;
+}
+
+.mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+}
+
+.mark.main {
+  background: var(--color-border);
+  opacity: 0.8;
+}
+
+.mark.sub {
+  background: var(--color-border);
+  opacity: 0.3;
+  top: 50%;
+}
+
+.label {
+  position: absolute;
+  bottom: 3px;
+  left: 4px;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  pointer-events: none;
+}

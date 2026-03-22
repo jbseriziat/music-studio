@@ -1,0 +1,19 @@
+.mainLayout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.padsSection {
+  flex-shrink: 0;
+  padding: 1rem;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border);
+}
+
+.timelineSection {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}

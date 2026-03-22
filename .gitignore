@@ -1,0 +1,17 @@
+node_modules/
+dist/
+src-tauri/target/
+.env
+*.msp
+# Tauri generated files
+src-tauri/gen/
+# Samples générés au runtime (recréés automatiquement)
+samples/
+# Projets utilisateur
+~/MusicStudio/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+files.zip

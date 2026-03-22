@@ -1,0 +1,23 @@
+.playhead {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  background: #F44336;
+  pointer-events: none;
+  z-index: 20;
+  /* Triangle en haut */
+  transform: translateX(-50%);
+}
+
+.playhead::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid #F44336;
+}

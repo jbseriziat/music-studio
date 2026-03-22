@@ -1,0 +1,74 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: sans-serif;
+  gap: 1rem;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: none;
+  background: #4a90e2;
+  color: white;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #357abd;
+}
+
+.ping-result {
+  font-size: 1.1rem;
+  color: #4CAF50;
+  font-weight: bold;
+}
+
+section {
+  width: 100%;
+  max-width: 700px;
+  background: #1e1e2e;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+h2 {
+  font-size: 1.3rem;
+  margin: 0 0 0.75rem;
+}
+
+.level-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.gates-section ul {
+  list-style: none;
+  padding: 0;
+  text-align: left;
+  margin: 0 auto;
+  display: inline-block;
+}
+
+.gates-section ul li {
+  padding: 0.25rem 0;
+}
+
+code {
+  background: #333;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}

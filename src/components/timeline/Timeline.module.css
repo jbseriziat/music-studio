@@ -1,0 +1,61 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--color-base);
+  border-top: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.scrollArea {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+  position: relative;
+}
+
+.content {
+  min-height: 100%;
+}
+
+.rulerRow {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.headerSpacer {
+  width: 130px;
+  min-width: 130px;
+  background: var(--color-surface-elevated);
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.rulerWrap {
+  flex: 1;
+  overflow: hidden;
+}
+
+.tracksArea {
+  position: relative;
+}
+
+.playheadWrapper {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.limitMsg {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 4px 0;
+  margin: 0;
+}

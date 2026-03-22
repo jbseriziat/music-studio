@@ -1,0 +1,46 @@
+.clip {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  padding: 2px 6px;
+  box-sizing: border-box;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  min-width: 20px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.clip:hover {
+  filter: brightness(1.1);
+}
+
+.clip.selected {
+  box-shadow: 0 0 0 2px white, 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.clip:active {
+  cursor: grabbing;
+}
+
+.name {
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
+}
+
+.waveform {
+  color: white;
+  flex: 1;
+  min-height: 0;
+}

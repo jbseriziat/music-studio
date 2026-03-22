@@ -1,0 +1,97 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  transition: width var(--transition, 180ms ease);
+  height: 100%;
+}
+
+.sidebar.expanded {
+  width: var(--sidebar-width);
+}
+
+.sidebar.collapsed {
+  width: 0;
+  border-right-width: 0;
+}
+
+/* ─── Barre de toggle : toujours visible ─── */
+
+.toggleBar {
+  position: absolute;
+  left: 0;
+  top: calc(var(--header-height) + 8px);
+  z-index: 50;
+}
+
+.toggleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 32px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.toggleBtn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* ─── Contenu de la sidebar ─── */
+
+.content {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+  opacity: 1;
+  transition: opacity var(--transition);
+}
+
+.sidebar.collapsed .content {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.placeholderIcon {
+  font-size: 2rem;
+  opacity: 0.4;
+}
