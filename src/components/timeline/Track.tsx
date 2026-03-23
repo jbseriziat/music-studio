@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Clip } from './Clip';
 import { addClipCmd, moveClipCmd } from '../../utils/tauri-commands';
 import { useTracksStore } from '../../stores/tracksStore';
@@ -36,9 +36,14 @@ let clipIdCounter = 100;
 export function Track({ id, name, color, clips, pixelsPerSec, selectedClipId, onSelectClip, onDeleteTrack }: Props) {
   const { addClip, moveClip } = useTracksStore();
   const draggingRef = useRef<{ clipId: string; startX: number; startPos: number } | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  // Compteur de dragEnter/Leave pour gérer les enfants (qui déclenchent aussi ces événements).
+  const dragCountRef = useRef(0);
 
   const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    dragCountRef.current = 0;
+    setIsDragOver(false);
     const rect = e.currentTarget.getBoundingClientRect();
     const rawPos = (e.clientX - rect.left) / pixelsPerSec;
     const position = Math.max(0, snapToGrid(rawPos, SNAP_GRID));
@@ -77,6 +82,20 @@ export function Track({ id, name, color, clips, pixelsPerSec, selectedClipId, on
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCountRef.current += 1;
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    dragCountRef.current -= 1;
+    if (dragCountRef.current <= 0) {
+      dragCountRef.current = 0;
+      setIsDragOver(false);
+    }
   }, []);
 
   const handleClipMoveStart = useCallback((clipId: string, startX: number, startPos: number) => {
@@ -121,9 +140,11 @@ export function Track({ id, name, color, clips, pixelsPerSec, selectedClipId, on
         </button>
       </div>
       <div
-        className={styles.lane}
+        className={`${styles.lane} ${isDragOver ? styles.dragOver : ''}`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
       >
         {clips.map(clip => (
           <Clip

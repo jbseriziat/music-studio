@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import React, { useCallback } from 'react';
 import type { SampleInfo } from '../../utils/tauri-commands';
 import { SamplePreview } from './SamplePreview';
 import styles from './SampleList.module.css';
@@ -28,6 +28,7 @@ function MiniWaveform({ data }: { data: number[] }) {
       height={H}
       viewBox={`0 0 ${W} ${H}`}
       className={styles.waveform}
+      fill="currentColor"
       aria-hidden="true"
     >
       {Array.from({ length: barCount }, (_, i) => {

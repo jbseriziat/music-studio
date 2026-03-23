@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSettingsStore } from './stores/settingsStore';
 import { useProjectStore } from './stores/projectStore';
 import { useTransport } from './hooks/useTransport';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { AppShell } from './components/layout/AppShell';
 import { ProfileSelector } from './components/layout/ProfileSelector';
 import { ProjectBrowser } from './components/layout/ProjectBrowser';
@@ -15,6 +16,9 @@ function App() {
   const isProjectOpen = useProjectStore((s) => s.isProjectOpen);
   const { position } = useTransport();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Raccourcis clavier globaux (Espace, Suppr, Ctrl+Z, Ctrl+S)
+  useKeyboardShortcuts();
 
   return (
     <>

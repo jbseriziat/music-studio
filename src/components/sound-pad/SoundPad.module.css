@@ -1,9 +1,23 @@
-.pad {
+/* Wrapper position relative pour placer le bouton options par-dessus */
+.padWrapper {
   position: relative;
   width: 100%;
   aspect-ratio: 1;
   min-width: 100px;
   min-height: 100px;
+}
+
+/* État drag-over sur le wrapper */
+.dragOver .pad {
+  outline: 3px dashed rgba(255, 255, 255, 0.8);
+  outline-offset: -4px;
+  filter: brightness(1.2);
+  transform: scale(1.04);
+}
+
+.pad {
+  position: absolute;
+  inset: 0;
   border-radius: 16px;
   border: none;
   background: var(--pad-color, #9C27B0);
@@ -48,14 +62,6 @@
   100% { transform: scale(1.0);  filter: brightness(1.0); }
 }
 
-/* État drag-over : indique qu'on peut déposer un sample */
-.dragOver {
-  outline: 3px dashed rgba(255, 255, 255, 0.8);
-  outline-offset: -4px;
-  filter: brightness(1.2);
-  transform: scale(1.04);
-}
-
 /* Icône / emoji centrale — 32px comme demandé */
 .icon {
   font-size: 32px;
@@ -75,4 +81,75 @@
   white-space: nowrap;
   pointer-events: none;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* Bouton options (⋮) — visible au survol */
+.optionsBtn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  z-index: 10;
+  line-height: 1;
+  padding: 0;
+}
+
+.padWrapper:hover .optionsBtn {
+  opacity: 1;
+}
+
+.optionsBtn:hover {
+  background: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Menu contextuel Radix DropdownMenu */
+.menuContent {
+  min-width: 160px;
+  background: var(--color-surface-elevated, #1e1e2e);
+  border: 1px solid var(--color-border-strong, #35355a);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: var(--shadow-lg, 0 8px 28px rgba(0,0,0,0.7));
+  padding: 4px;
+  z-index: 200;
+  animation: menuFadeIn 120ms ease;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm, 5px);
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-primary, #e2e2ec);
+  cursor: pointer;
+  outline: none;
+  transition: background 0.1s;
+}
+
+.menuItem:hover,
+.menuItem[data-highlighted] {
+  background: var(--color-accent-glow, rgba(74, 144, 226, 0.18));
+}
+
+.menuItem[data-disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@keyframes menuFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
 }

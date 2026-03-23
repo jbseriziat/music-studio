@@ -7,6 +7,9 @@
   z-index: 20;
   /* Triangle en haut */
   transform: translateX(-50%);
+  /* Animation fluide : synchronisée avec le polling à 50ms */
+  transition: left 55ms linear;
+  box-shadow: 0 0 6px rgba(244, 67, 54, 0.6);
 }
 
 .playhead::before {

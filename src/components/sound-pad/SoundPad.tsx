@@ -1,5 +1,7 @@
 import React, { useState, useCallback } from 'react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { usePadsStore } from '../../stores/padsStore';
+import { SamplePickerDialog } from './SamplePickerDialog';
 import styles from './SoundPad.module.css';
 
 interface Props {
@@ -15,12 +17,13 @@ interface Props {
 export function SoundPad({ id, color, textColor = '#fff', icon, sampleName, sampleId }: Props) {
   const [isTriggered, setIsTriggered] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const triggerPad = usePadsStore((s) => s.triggerPad);
   const assignPadSample = usePadsStore((s) => s.assignPadSample);
 
   const handleClick = useCallback(async () => {
     if (sampleId === null) return;
-    // Lancer l'IPC (fire-and-forget, l'animation est indépendante)
     triggerPad(id);
     // Animation pulse : scale 0.95 → 1.05 → 1.0 sur 150ms
     setIsTriggered(true);
@@ -64,28 +67,76 @@ export function SoundPad({ id, color, textColor = '#fff', icon, sampleName, samp
     }
   }, [id, assignPadSample]);
 
+  /** Clic droit → ouvrir le menu contextuel. */
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    // TODO: ouvrir une modale de réassignation (prompt 1.7+)
-    console.log('[SoundPad] context menu — pad', id);
-  }, [id]);
+    setMenuOpen(true);
+  }, []);
 
   return (
-    <button
-      className={`${styles.pad} ${isTriggered ? styles.triggered : ''} ${isDragOver ? styles.dragOver : ''}`}
-      style={{ '--pad-color': color, '--text-color': textColor } as React.CSSProperties}
-      onClick={handleClick}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+    <div
+      className={`${styles.padWrapper} ${isDragOver ? styles.dragOver : ''}`}
       onContextMenu={handleContextMenu}
-      draggable={sampleId !== null}
-      title={sampleName || 'Glisser un son ici'}
-      aria-label={`Pad ${id + 1}: ${sampleName || 'vide'}`}
     >
-      <span className={styles.icon}>{icon}</span>
-      <span className={styles.name}>{sampleName || '—'}</span>
-    </button>
+      {/* Pad principal */}
+      <button
+        className={`${styles.pad} ${isTriggered ? styles.triggered : ''}`}
+        style={{ '--pad-color': color, '--text-color': textColor } as React.CSSProperties}
+        onClick={handleClick}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        draggable={sampleId !== null}
+        title={sampleName || 'Glisser un son ici'}
+        aria-label={`Pad ${id + 1}: ${sampleName || 'vide'}`}
+      >
+        <span className={styles.icon}>{icon}</span>
+        <span className={styles.name}>{sampleName || '—'}</span>
+      </button>
+
+      {/* Menu contextuel via Radix DropdownMenu */}
+      <DropdownMenu.Root open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenu.Trigger asChild>
+          {/* Bouton discret en haut à droite du pad */}
+          <button
+            className={styles.optionsBtn}
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(true); }}
+            aria-label={`Options du pad ${id + 1}`}
+            tabIndex={-1}
+          >
+            ⋮
+          </button>
+        </DropdownMenu.Trigger>
+
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content className={styles.menuContent} sideOffset={4} align="end">
+            <DropdownMenu.Item
+              className={styles.menuItem}
+              onSelect={() => setPickerOpen(true)}
+            >
+              🎵 Changer le son
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              className={styles.menuItem}
+              onSelect={() => { if (sampleId !== null) triggerPad(id); }}
+              disabled={sampleId === null}
+            >
+              🔊 Jouer
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
+
+      {/* Dialogue de sélection de son */}
+      <SamplePickerDialog
+        padId={id}
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(newSampleId, newSampleName) =>
+          assignPadSample(id, newSampleId, newSampleName)
+        }
+      />
+    </div>
   );
 }

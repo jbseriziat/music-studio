@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Résumé d'un projet affiché dans le navigateur de projets.
 #[derive(Debug, Clone, Serialize, Deserialize)]

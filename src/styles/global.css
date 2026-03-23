@@ -166,6 +166,30 @@ a { color: inherit; text-decoration: none; }
   --font-size-2xl:  1.875rem;
 }
 
+/* ─── Aliases de compatibilité (--color-* → --bg-* / --text-* / --border) ────── */
+/* Les composants utilisent --color-* ; les thèmes définissent --bg-* / --text-* */
+/* Les valeurs sont résolues lazily, donc elles suivent le thème actif.           */
+
+:root {
+  --color-base:             var(--bg-base);
+  --color-surface:          var(--bg-surface);
+  --color-surface-elevated: var(--bg-elevated);
+  --color-overlay:          var(--bg-overlay);
+
+  --color-border:           var(--border);
+  --color-border-strong:    var(--border-strong);
+
+  --color-text-primary:     var(--text-primary);
+  --color-text-secondary:   var(--text-secondary);
+  --color-text-muted:       var(--text-muted);
+  --color-text-disabled:    var(--text-disabled);
+
+  --color-accent:           var(--accent);
+  --color-accent-hover:     var(--accent-hover);
+  --color-accent-dim:       var(--accent-dim);
+  --color-accent-glow:      var(--accent-glow);
+}
+
 /* ─── Styles de base (utilisent les variables) ───────────────────────────────── */
 
 body {
