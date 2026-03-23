@@ -5,7 +5,7 @@ use ringbuf::{
     HeapRb,
 };
 use std::sync::{
-    atomic::{AtomicBool, AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering},
     Arc, Mutex,
 };
 
@@ -27,15 +27,18 @@ struct SampleData {
     sample_rate: u32,
 }
 
-// ─── Une voix de lecture (pad ou clip) ───────────────────────────────────────
+// ─── Une voix de lecture (pad, clip ou drum) ─────────────────────────────────
 struct Voice {
     sample_id: u32,
     /// Position en frames (index dans SampleData::frames / channels).
     position: usize,
+    /// Facteur de vélocité (0.0 – 1.0). 1.0 = volume nominal.
+    velocity: f32,
 }
 
 impl Voice {
-    /// Lit la prochaine frame stéréo. Retourne (0.0, 0.0) si le sample est inconnu.
+    /// Lit la prochaine frame stéréo, avec application de la vélocité.
+    /// Retourne (0.0, 0.0) si le sample est inconnu ou terminé.
     fn next_stereo(&mut self, samples: &[Option<SampleData>]) -> (f32, f32) {
         let Some(Some(sd)) = samples.get(self.sample_id as usize) else {
             return (0.0, 0.0);
@@ -45,8 +48,8 @@ impl Voice {
             return (0.0, 0.0);
         }
         let base = self.position * sd.channels as usize;
-        let l = sd.frames[base];
-        let r = if sd.channels > 1 { sd.frames[base + 1] } else { l };
+        let l = sd.frames[base] * self.velocity;
+        let r = if sd.channels > 1 { sd.frames[base + 1] * self.velocity } else { l };
         self.position += 1;
         (l, r)
     }
@@ -72,7 +75,6 @@ struct AudioCallbackState {
     master_volume: f32,
     is_playing: bool,
     position_frames: u64,
-    #[allow(dead_code)]
     sample_rate: u32,
 
     /// Banque de samples : indexé par sample_id. Pré-alloué à 256.
@@ -91,9 +93,36 @@ struct AudioCallbackState {
     /// Voix de clip actives : (clip_id, voice). Pré-alloué à 64.
     clip_voices: Vec<(u32, Voice)>,
 
-    /// Référence partagée pour exposer la position au thread principal.
+    // ─── BPM & Drum Sequencer ─────────────────────────────────────────────────
+    /// Tempo actuel en BPM.
+    bpm: f64,
+    /// Durée d'un step en samples (= sample_rate * 60 / (bpm * 4)).
+    samples_per_step: f64,
+    /// Compteur de samples depuis le début du step courant.
+    sequencer_counter: f64,
+    /// Index du step actuel (0..drum_pattern_steps).
+    sequencer_step: usize,
+    /// Nombre de steps dans le pattern (8, 16 ou 32).
+    drum_pattern_steps: usize,
+    /// Étapes actives : drum_pad_steps[pad][step].
+    drum_pad_steps: [[bool; 32]; 8],
+    /// Vélocités par step : drum_pad_velocities[pad][step] (0.0–1.0).
+    drum_pad_velocities: [[f32; 32]; 8],
+    /// Sample assigné à chaque pad du drum rack (index 0–7).
+    drum_pad_samples: [u32; 8],
+    /// Voix de drum rack actives. Pré-alloué à 64.
+    drum_voices: Vec<Voice>,
+
+    // ─── Métronome ────────────────────────────────────────────────────────────
+    metronome_enabled: bool,
+    /// Voix du click métronome en cours.
+    metronome_voice: Option<Voice>,
+
+    // ─── Atomics partagés avec le thread principal ────────────────────────────
     position_atomic: Arc<AtomicU64>,
     is_playing_atomic: Arc<AtomicBool>,
+    /// Step courant du séquenceur (pour l'UI).
+    current_step_atomic: Arc<AtomicU8>,
 }
 
 impl AudioCallbackState {
@@ -111,6 +140,12 @@ impl AudioCallbackState {
                 self.is_playing = false;
                 self.position_frames = 0;
                 self.clip_voices.clear();
+                self.drum_voices.clear();
+                // Réinitialiser le séquenceur au step 0.
+                self.sequencer_step = 0;
+                self.sequencer_counter = 0.0;
+                self.current_step_atomic.store(0, Ordering::Relaxed);
+                self.metronome_voice = None;
                 self.is_playing_atomic.store(false, Ordering::Relaxed);
                 self.position_atomic.store(0, Ordering::Relaxed);
             }
@@ -150,12 +185,12 @@ impl AudioCallbackState {
                         }
                     }
                     if self.pad_voices.len() < 128 {
-                        self.pad_voices.push(Voice { sample_id, position: 0 });
+                        self.pad_voices.push(Voice { sample_id, position: 0, velocity: 1.0 });
                     }
                 }
             }
             AudioCommand::PreviewSample { id } => {
-                self.preview_voice = Some(Voice { sample_id: id, position: 0 });
+                self.preview_voice = Some(Voice { sample_id: id, position: 0, velocity: 1.0 });
             }
             AudioCommand::StopPreview => {
                 self.preview_voice = None;
@@ -179,10 +214,82 @@ impl AudioCallbackState {
             AudioCommand::ClearTimeline => {
                 self.clips.clear();
                 self.clip_voices.clear();
+                self.drum_voices.clear();
+                self.sequencer_step = 0;
+                self.sequencer_counter = 0.0;
+                self.current_step_atomic.store(0, Ordering::Relaxed);
                 self.position_frames = 0;
                 self.is_playing = false;
                 self.is_playing_atomic.store(false, Ordering::Relaxed);
                 self.position_atomic.store(0, Ordering::Relaxed);
+            }
+
+            // ── BPM & Drum Sequencer ─────────────────────────────────────────────
+            AudioCommand::SetBpm { bpm } => {
+                self.bpm = bpm.clamp(20.0, 300.0);
+                // samples_per_step = SR * 60 / (bpm * 4) pour du 1/16 à 4/4
+                self.samples_per_step = (self.sample_rate as f64 * 60.0) / (self.bpm * 4.0);
+            }
+            AudioCommand::SetDrumStep { pad, step, active, velocity } => {
+                let p = pad as usize;
+                let s = step as usize;
+                if p < 8 && s < 32 {
+                    self.drum_pad_steps[p][s] = active;
+                    self.drum_pad_velocities[p][s] = velocity.clamp(0.0, 1.0);
+                }
+            }
+            AudioCommand::AssignDrumPad { pad, sample_id } => {
+                if (pad as usize) < 8 {
+                    self.drum_pad_samples[pad as usize] = sample_id;
+                }
+            }
+            AudioCommand::TriggerDrumPad { pad } => {
+                let p = pad as usize;
+                if p < 8 && self.drum_voices.len() < 64 {
+                    let sample_id = self.drum_pad_samples[p];
+                    self.drum_voices.push(Voice { sample_id, position: 0, velocity: 1.0 });
+                }
+            }
+            AudioCommand::SetMetronome { enabled } => {
+                self.metronome_enabled = enabled;
+                if !enabled {
+                    self.metronome_voice = None;
+                }
+            }
+            AudioCommand::SetDrumStepCount { count } => {
+                let c = (count as usize).max(1).min(32);
+                self.drum_pattern_steps = c;
+                // Si le step courant dépasse la nouvelle longueur, on le remet à 0.
+                if self.sequencer_step >= c {
+                    self.sequencer_step = 0;
+                    self.sequencer_counter = 0.0;
+                }
+            }
+            AudioCommand::SetDrumPattern { pattern } => {
+                self.drum_pattern_steps = (pattern.steps as usize).max(1).min(32);
+                // Réinitialiser toutes les cases.
+                for p in 0..8 {
+                    for s in 0..32 {
+                        self.drum_pad_steps[p][s] = false;
+                        self.drum_pad_velocities[p][s] = 1.0;
+                    }
+                }
+                // Copier les données du pattern reçu.
+                for (p, pad_steps) in pattern.pads.iter().enumerate().take(8) {
+                    for (s, &active) in pad_steps.iter().enumerate().take(self.drum_pattern_steps) {
+                        self.drum_pad_steps[p][s] = active;
+                    }
+                }
+                for (p, pad_vels) in pattern.velocities.iter().enumerate().take(8) {
+                    for (s, &vel) in pad_vels.iter().enumerate().take(self.drum_pattern_steps) {
+                        self.drum_pad_velocities[p][s] = vel.clamp(0.0, 1.0);
+                    }
+                }
+                // Réinitialiser le séquenceur si hors limites.
+                if self.sequencer_step >= self.drum_pattern_steps {
+                    self.sequencer_step = 0;
+                    self.sequencer_counter = 0.0;
+                }
             }
         }
     }
@@ -198,6 +305,8 @@ pub struct AudioEngine {
     pub position_frames: Arc<AtomicU64>,
     /// État de lecture (partagé avec le callback audio).
     pub is_playing: Arc<AtomicBool>,
+    /// Step courant du séquenceur (partagé avec le callback audio).
+    pub current_step: Arc<AtomicU8>,
 }
 
 impl AudioEngine {
@@ -213,6 +322,7 @@ impl AudioEngine {
                     config: AudioConfig::default(),
                     position_frames: Arc::new(AtomicU64::new(0)),
                     is_playing: Arc::new(AtomicBool::new(false)),
+                    current_step: Arc::new(AtomicU8::new(0)),
                 }
             }
         }
@@ -243,12 +353,18 @@ impl AudioEngine {
 
         let position_atomic = Arc::new(AtomicU64::new(0));
         let is_playing_atomic = Arc::new(AtomicBool::new(false));
+        let current_step_atomic = Arc::new(AtomicU8::new(0));
         let position_atomic_cb = Arc::clone(&position_atomic);
         let is_playing_atomic_cb = Arc::clone(&is_playing_atomic);
+        let current_step_atomic_cb = Arc::clone(&current_step_atomic);
 
         // Pré-allouer l'état du callback (pas d'allocation dans le callback lui-même).
         let mut samples: Vec<Option<SampleData>> = Vec::with_capacity(256);
         samples.resize_with(256, || None);
+
+        // BPM par défaut : 120. samples_per_step = 48000 * 60 / (120 * 4) = 6000
+        let default_bpm = 120.0f64;
+        let default_sps = (sample_rate as f64 * 60.0) / (default_bpm * 4.0);
 
         let mut state = AudioCallbackState {
             master_volume: 1.0,
@@ -261,8 +377,23 @@ impl AudioEngine {
             preview_voice: None,
             clips: Vec::with_capacity(64),
             clip_voices: Vec::with_capacity(64),
+            // Drum sequencer
+            bpm: default_bpm,
+            samples_per_step: default_sps,
+            sequencer_counter: 0.0,
+            sequencer_step: 0,
+            drum_pattern_steps: 16,
+            drum_pad_steps: [[false; 32]; 8],
+            drum_pad_velocities: [[1.0; 32]; 8],
+            // Mapping par défaut : kick, snare, hihat, hihat_open, clap, tomH, tomB, snare2
+            drum_pad_samples: [0, 2, 4, 5, 6, 7, 8, 3],
+            drum_voices: Vec::with_capacity(64),
+            metronome_enabled: false,
+            metronome_voice: None,
+            // Atomics
             position_atomic: position_atomic_cb,
             is_playing_atomic: is_playing_atomic_cb,
+            current_step_atomic: current_step_atomic_cb,
         };
 
         let output_channels = channels as usize;
@@ -287,7 +418,7 @@ impl AudioEngine {
                                     if state.clip_voices.len() < 64 {
                                         state.clip_voices.push((
                                             clip.id,
-                                            Voice { sample_id: clip.sample_id, position: 0 },
+                                            Voice { sample_id: clip.sample_id, position: 0, velocity: 1.0 },
                                         ));
                                     }
                                 }
@@ -336,6 +467,56 @@ impl AudioEngine {
                             }
                         });
 
+                        // ── Drum Sequencer ─────────────────────────────────────
+                        if state.samples_per_step > 0.0 {
+                            state.sequencer_counter += 1.0;
+                            if state.sequencer_counter >= state.samples_per_step {
+                                state.sequencer_counter -= state.samples_per_step;
+                                // Avancer au step suivant (boucle).
+                                state.sequencer_step = (state.sequencer_step + 1) % state.drum_pattern_steps;
+                                state.current_step_atomic.store(
+                                    state.sequencer_step as u8,
+                                    Ordering::Relaxed,
+                                );
+
+                                // Déclencher les pads actifs pour ce step.
+                                for pad in 0..8usize {
+                                    if state.drum_pad_steps[pad][state.sequencer_step] {
+                                        if state.drum_voices.len() < 64 {
+                                            let sid = state.drum_pad_samples[pad];
+                                            let vel = state.drum_pad_velocities[pad][state.sequencer_step];
+                                            state.drum_voices.push(Voice { sample_id: sid, position: 0, velocity: vel });
+                                        }
+                                    }
+                                }
+
+                                // ── Métronome (click tous les 4 steps = 1 temps) ──
+                                if state.metronome_enabled && state.sequencer_step % 4 == 0 {
+                                    // Accent sur le premier temps (step 0), click normal sinon.
+                                    let metro_sid = if state.sequencer_step == 0 { 2u32 } else { 4u32 };
+                                    state.metronome_voice = Some(Voice { sample_id: metro_sid, position: 0, velocity: 0.6 });
+                                }
+                            }
+                        }
+
+                        // ── Voix de drum rack ──────────────────────────────────
+                        for voice in &mut state.drum_voices {
+                            let (l, r) = voice.next_stereo(&state.samples);
+                            left += l;
+                            right += r;
+                        }
+                        state.drum_voices.retain(|v| !v.is_done(&state.samples));
+
+                        // ── Voix de métronome ──────────────────────────────────
+                        if let Some(ref mut mv) = state.metronome_voice {
+                            let (l, r) = mv.next_stereo(&state.samples);
+                            left += l;
+                            right += r;
+                            if mv.is_done(&state.samples) {
+                                state.metronome_voice = None;
+                            }
+                        }
+
                         state.position_frames += 1;
                         // Mise à jour atomique périodique (~chaque 512 frames).
                         if state.position_frames % 512 == 0 {
@@ -376,6 +557,7 @@ impl AudioEngine {
             config,
             position_frames: position_atomic,
             is_playing: is_playing_atomic,
+            current_step: current_step_atomic,
         })
     }
 

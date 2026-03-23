@@ -1,0 +1,50 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Bouton pad — 130px de large pour aligner avec les colonnes */
+.padBtn {
+  width: 130px;
+  min-width: 130px;
+  height: 36px;
+  border-radius: var(--radius-sm, 5px);
+  border: 2px solid var(--pad-color, #9C27B0);
+  background: color-mix(in srgb, var(--pad-color, #9C27B0) 20%, transparent);
+  color: var(--color-text-primary, #e2e2ec);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  transition: background 0.12s, transform 0.08s;
+  flex-shrink: 0;
+}
+
+.padBtn:hover {
+  background: color-mix(in srgb, var(--pad-color, #9C27B0) 35%, transparent);
+}
+
+.padBtn:active {
+  transform: scale(0.95);
+}
+
+.padIcon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.padName {
+  font-size: 11px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Grille de cellules */
+.cells {
+  display: flex;
+  gap: 3px;
+}

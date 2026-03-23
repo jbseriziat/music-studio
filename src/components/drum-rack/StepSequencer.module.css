@@ -1,0 +1,6 @@
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: max-content;
+}

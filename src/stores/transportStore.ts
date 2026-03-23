@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { playAudio, pauseAudio, stopAudio, getPosition } from '../utils/tauri-commands';
+import { playAudio, pauseAudio, stopAudio, getPosition, setBpmCmd, setMetronomeCmd } from '../utils/tauri-commands';
 
 interface TransportState {
   // ─── État ─────────────────────────────────────────────────────────────────
@@ -84,7 +84,11 @@ export const useTransportStore = create<TransportState>()((set) => ({
 
   setPlaying: (isPlaying) => set({ isPlaying }),
   setRecording: (isRecording) => set({ isRecording }),
-  setBpm: (bpm) => set({ bpm: Math.max(40, Math.min(240, bpm)) }),
+  setBpm: (bpm) => {
+    const clamped = Math.max(40, Math.min(240, bpm));
+    set({ bpm: clamped });
+    setBpmCmd(clamped).catch((e) => console.error('[TransportStore] setBpm error', e));
+  },
   setPosition: (position) => set({ position }),
   setLoop: (loopEnabled, loopStart, loopEnd) =>
     set((s) => ({
@@ -92,5 +96,10 @@ export const useTransportStore = create<TransportState>()((set) => ({
       loopStart: loopStart ?? s.loopStart,
       loopEnd: loopEnd ?? s.loopEnd,
     })),
-  toggleMetronome: () => set((s) => ({ metronomeEnabled: !s.metronomeEnabled })),
+  toggleMetronome: () =>
+    set((s) => {
+      const enabled = !s.metronomeEnabled;
+      setMetronomeCmd(enabled).catch((e) => console.error('[TransportStore] setMetronome error', e));
+      return { metronomeEnabled: enabled };
+    }),
 }));

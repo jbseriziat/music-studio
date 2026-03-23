@@ -163,3 +163,43 @@ export const getProjectPath = (name: string): Promise<string> =>
 
 export const deleteProjectFile = (path: string): Promise<void> =>
   invoke<void>('delete_project', { path });
+
+// ─── Drum Rack & Séquenceur ───────────────────────────────────────────────────
+
+export interface DrumPatternDto {
+  steps: number;
+  pads: boolean[][];        // [pad][step]
+  velocities: number[][];   // [pad][step]
+}
+
+/** Définit le BPM (20–300). */
+export const setBpmCmd = (bpm: number): Promise<void> =>
+  invoke<void>('set_bpm', { bpm });
+
+/** Active ou désactive un step pour un pad. velocity ∈ [0.0, 1.0]. */
+export const setDrumStep = (pad: number, step: number, active: boolean, velocity = 1.0): Promise<void> =>
+  invoke<void>('set_drum_step', { pad, step, active, velocity });
+
+/** Assigne un sample à un pad du drum rack. */
+export const assignDrumPad = (pad: number, sampleId: number): Promise<void> =>
+  invoke<void>('assign_drum_pad', { pad, sampleId });
+
+/** Déclenche immédiatement un pad du drum rack. */
+export const triggerDrumPadCmd = (pad: number): Promise<void> =>
+  invoke<void>('trigger_drum_pad', { pad });
+
+/** Active ou désactive le métronome. */
+export const setMetronomeCmd = (enabled: boolean): Promise<void> =>
+  invoke<void>('set_metronome', { enabled });
+
+/** Retourne le step courant du séquenceur (0–31). */
+export const getCurrentStep = (): Promise<number> =>
+  invoke<number>('get_current_step');
+
+/** Définit le nombre de steps du pattern (8, 16, 32). */
+export const setDrumStepCount = (count: number): Promise<void> =>
+  invoke<void>('set_drum_step_count', { count });
+
+/** Remplace tout le pattern d'un coup (chargement projet/preset). */
+export const setDrumPattern = (pattern: DrumPatternDto): Promise<void> =>
+  invoke<void>('set_drum_pattern', { pattern });

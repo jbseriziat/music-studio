@@ -18,6 +18,10 @@ use commands::audio_commands::{
     add_clip, clear_timeline, delete_clip, move_clip, pause, ping_audio, play, set_master_volume,
     set_position, stop,
 };
+use commands::drum_commands::{
+    assign_drum_pad, get_current_step, set_bpm, set_drum_pattern, set_drum_step,
+    set_drum_step_count, set_metronome, trigger_drum_pad,
+};
 use commands::project_commands::{
     delete_project, get_project_path, get_projects_dir, list_projects, load_project, new_project,
     save_project,
@@ -97,6 +101,15 @@ pub fn run() {
             stop_preview,
             get_position,
             get_pad_config,
+            // Drum rack & séquenceur
+            set_bpm,
+            set_drum_step,
+            assign_drum_pad,
+            trigger_drum_pad,
+            set_metronome,
+            get_current_step,
+            set_drum_step_count,
+            set_drum_pattern,
             // Settings
             get_audio_devices,
             get_profiles,
