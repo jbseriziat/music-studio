@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { useDrumStore } from '../../stores/drumStore';
 import { SamplePickerDialog } from '../sound-pad/SamplePickerDialog';
@@ -13,14 +13,20 @@ interface Props {
   volume: number;
   /** Pitch du pad : −12 à +12 demi-tons. */
   pitch: number;
+  /**
+   * Timestamp (ms) mis à jour chaque fois que le séquenceur déclenche ce pad.
+   * Un changement de valeur déclenche l'animation pulse (indépendamment des clics).
+   */
+  firedAt?: number;
 }
 
 /**
  * Pad du drum rack : bouton de déclenchement + popover de réglages (volume, pitch, sample).
  * - Clic sur le pad → joue le son + animation pulse.
  * - Clic droit OU bouton ⚙ → ouvre le popover de réglages.
+ * - `firedAt` change → pulse animé (déclenché par le séquenceur).
  */
-export function DrumPad({ padIndex, padName, padIcon, padColor, volume, pitch }: Props) {
+export function DrumPad({ padIndex, padName, padIcon, padColor, volume, pitch, firedAt }: Props) {
   const { triggerPad, setPadVolume, setPadPitch, assignPad } = useDrumStore();
 
   const [pulsing, setPulsing]           = useState(false);
@@ -28,7 +34,15 @@ export function DrumPad({ padIndex, padName, padIcon, padColor, volume, pitch }:
   const [pickerOpen, setPickerOpen]     = useState(false);
   const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Déclenchement du son + animation ──────────────────────────────────────
+  // ── Déclenchement par le séquenceur (firedAt change) ──────────────────────
+  useEffect(() => {
+    if (!firedAt) return;
+    setPulsing(true);
+    if (pulseTimer.current) clearTimeout(pulseTimer.current);
+    pulseTimer.current = setTimeout(() => setPulsing(false), 160);
+  }, [firedAt]);
+
+  // ── Déclenchement manuel (clic) ───────────────────────────────────────────
   const handleTrigger = useCallback(() => {
     triggerPad(padIndex);
     setPulsing(true);

@@ -1,0 +1,31 @@
+/* ─── Curseur de lecture : colonne semi-transparente animée ─────────────────── */
+.cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 22px;                          /* Même largeur qu'une cellule */
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  pointer-events: none;                 /* Ne bloque pas les clics sur les cellules */
+  transition: left 40ms linear;         /* Correspond à l'intervalle de polling 40ms */
+  will-change: left;
+  z-index: 1;
+}
+
+/* Halo lumineux sur la bordure supérieure */
+.cursor::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 3px 3px 0 0;
+}
+
+/* Masqué quand la lecture est arrêtée */
+.hidden {
+  display: none;
+}
