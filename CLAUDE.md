@@ -81,7 +81,34 @@ Les specs complètes de chaque phase sont dans le dossier `docs/` :
 IMPORTANT : avant d'implémenter une tâche, lis toujours la spec de la phase correspondante ET la spec d'architecture (Phase 0).
 
 ## Phase en cours
-Phase 2 — Petit Producteur : Drum Rack + Step Sequencer + BPM (voir @docs/SPEC_PHASE_2_PETIT_PRODUCTEUR.md)
+Phase 3 — Mélodiste : Piano Roll + Synthétiseur + MIDI (voir @docs/SPEC_PHASE_3_MELODISTE.md)
+
+## Phase 2 — ✅ TERMINÉE
+
+Étapes réalisées :
+1. ✅ BPM control (40–240), drag vertical, emojis de vitesse 🐢🚶🏃🚀
+2. ✅ Drum Rack 8 pads — kit par défaut, changement de son, volume/pitch par pad
+3. ✅ Kits prédéfinis (Hip-Hop, Electronic, Rock, Kids) via DrumKitSelector
+4. ✅ Step Sequencer 8×16 cases, repères visuels tous les 4 steps, configurable 8/16/32
+5. ✅ Curseur de lecture sur la grille (polling 40ms via `get_current_step`)
+6. ✅ Mode Loop — bouton 🔁, marqueurs draggables sur la TimeRuler, reset position dans le callback
+7. ✅ Métronome — accent (1000 Hz) sur le 1er temps, clic (800 Hz) sur les autres, volume indépendant
+8. ✅ Mute/Solo par piste (boutons M/S, arrays `[bool; 64]` lock-free dans le callback)
+9. ✅ Timeline en mesures/temps au niveau 2+ (BeatsRuler remplace SecondsRuler)
+10. ✅ Zoom horizontal (Ctrl+molette, 20–600 px/s)
+11. ✅ Piste DrumRack intégrée dans la timeline (DrumClip mini-grid read-only)
+12. ✅ Double-clic sur la piste Drum Rack → bascule sur l'onglet Drum Rack
+13. ✅ Sauvegarde/restauration du pattern drum dans .msp (`drum_pattern` + `track_type`)
+14. ✅ 28 tests Rust passants, 0 erreur TypeScript
+
+Notes d'implémentation Phase 2 :
+- `samples_per_step = sample_rate × 60 / (bpm × 4)` — recalcul lock-free via `AudioCommand::SetBpm`
+- Métronome synthétique généré au démarrage (IDs réservés 253/254 dans la banque de samples)
+- Step cursor : overlay CSS absolu, polling `getCurrentStep()` toutes les 40ms
+- Mute/Solo : `[bool; 64]` indexés par `track_id % 64`, flag `any_track_solo` pour éviter itération
+- Loop : `position_frames >= loop_end_frames` → reset + prune des voix hors zone
+- DrumClip : largeur = `(stepCount/4) × (60/bpm) × pixelsPerSec` (se met à jour au changement de BPM)
+- `#[serde(default)]` sur `drum_pattern` et `track_type` → rétrocompatibilité avec les anciens .msp
 
 ## Phase 1 — ✅ TERMINÉE
 
