@@ -69,7 +69,10 @@ function App() {
             {activeTab === 'drums' && isVisible(2) && <DrumRack />}
           </section>
           <section className={styles.timelineSection}>
-            <Timeline positionSecs={position} />
+            <Timeline
+              positionSecs={position}
+              onDrumTrackDoubleClick={() => setActiveTab('drums')}
+            />
           </section>
         </div>
       </AppShell>

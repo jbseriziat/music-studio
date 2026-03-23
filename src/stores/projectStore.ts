@@ -13,6 +13,7 @@ import {
 } from '../utils/tauri-commands';
 import { useTracksStore } from './tracksStore';
 import { usePadsStore } from './padsStore';
+import { useDrumStore } from './drumStore';
 import type { Track, Clip } from '../types/audio';
 
 // ─── État ────────────────────────────────────────────────────────────────────
@@ -48,15 +49,19 @@ function buildProjectTracks(): ProjectTrack[] {
     pan: t.pan,
     muted: t.muted,
     solo: t.solo,
-    clips: clips
-      .filter((c) => c.trackId === t.id)
-      .map((c): ProjectClip => ({
-        id: c.id,
-        sample_id: Number(c.sampleId),
-        position: c.position,
-        duration: c.duration,
-        color: c.color,
-      })),
+    track_type: t.type,
+    // Les pistes DrumRack n'ont pas de clips audio — leur pattern est stocké séparément.
+    clips: t.type === 'drum_rack'
+      ? []
+      : clips
+          .filter((c) => c.trackId === t.id)
+          .map((c): ProjectClip => ({
+            id: c.id,
+            sample_id: Number(c.sampleId),
+            position: c.position,
+            duration: c.duration,
+            color: c.color,
+          })),
   }));
 }
 
@@ -65,7 +70,7 @@ function restoreTracks(project: MspProject): void {
   const tracks: Track[] = project.tracks.map((t) => ({
     id: t.id,
     name: t.name,
-    type: 'audio' as const,
+    type: (t.track_type as Track['type']) ?? 'audio',
     color: t.color,
     volume: t.volume,
     pan: t.pan,
@@ -179,6 +184,11 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     restorePads(project);
     await syncRestoredClipsToEngine(project);
 
+    // Restaure le pattern drum rack si présent.
+    if (project.drum_pattern) {
+      useDrumStore.getState().applyPattern(project.drum_pattern);
+    }
+
     set({
       projectName: project.name,
       projectPath: path,
@@ -206,6 +216,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   buildAndSave: async (path: string) => {
     const { projectName } = get();
     const { pads } = usePadsStore.getState();
+    const { steps, velocities, stepCount } = useDrumStore.getState();
 
     const project: MspProject = {
       version: '1.0',
@@ -215,6 +226,11 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       bpm: 120,
       tracks: buildProjectTracks(),
       pads: pads.map((p) => ({ id: p.id, sample_id: p.sampleId })),
+      drum_pattern: {
+        steps: stepCount,
+        pads: steps.map((row) => row.slice(0, stepCount)),
+        velocities: velocities.map((row) => row.slice(0, stepCount)),
+      },
     };
 
     await saveProjectCmd(path, project);

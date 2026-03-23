@@ -17,12 +17,14 @@ const MAX_TRACKS_LEVEL1 = 4;
 
 interface Props {
   positionSecs: number;
+  /** Appelé quand l'utilisateur double-clique sur la piste Drum Rack. */
+  onDrumTrackDoubleClick?: () => void;
 }
 
 let trackIdCounter = 0;
 const TRACK_COLORS = ['#FF5722', '#2196F3', '#4CAF50', '#9C27B0', '#FF9800', '#00BCD4'];
 
-export function Timeline({ positionSecs }: Props) {
+export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
   const { tracks, clips, selectedClipId, addTrack, removeTrack, selectClip } = useTracksStore();
   const { currentLevel } = useFeatureLevel();
   const bpm         = useTransportStore((s) => s.bpm);
@@ -72,6 +74,14 @@ export function Timeline({ positionSecs }: Props) {
     el.addEventListener('wheel', handleWheel, { passive: false });
     return () => el.removeEventListener('wheel', handleWheel);
   }, [handleWheel]);
+
+  // Auto-ajout de la piste Drum Rack au niveau 2+.
+  const hasDrumTrack = tracks.some((t) => t.type === 'drum_rack');
+  useEffect(() => {
+    if (currentLevel >= 2 && !hasDrumTrack) {
+      addTrack('Drum Rack', 'drum_rack', '#FF9800');
+    }
+  }, [currentLevel, hasDrumTrack, addTrack]);
 
   // Touche Suppr pour effacer le clip sélectionné (frontend + moteur audio).
   useEffect(() => {
@@ -156,10 +166,14 @@ export function Timeline({ positionSecs }: Props) {
                     color: c.color,
                     waveformData: c.waveformData,
                   }))}
+                trackType={track.type}
                 pixelsPerSec={pixelsPerSec}
                 selectedClipId={selectedClipId}
                 onSelectClip={selectClip}
                 onDeleteTrack={removeTrack}
+                onDoubleClickHeader={
+                  track.type === 'drum_rack' ? onDrumTrackDoubleClick : undefined
+                }
               />
             ))}
           </div>

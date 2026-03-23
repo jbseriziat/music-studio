@@ -36,6 +36,8 @@ export interface MspProject {
   bpm: number;
   tracks: ProjectTrack[];
   pads: ProjectPad[];
+  /** Pattern du drum rack, absent dans les anciens projets. */
+  drum_pattern?: DrumPatternDto;
 }
 
 export interface ProjectTrack {
@@ -47,6 +49,8 @@ export interface ProjectTrack {
   muted: boolean;
   solo: boolean;
   clips: ProjectClip[];
+  /** Type de la piste : "audio" | "drum_rack" | "instrument". Absent = "audio". */
+  track_type?: string;
 }
 
 export interface ProjectClip {
