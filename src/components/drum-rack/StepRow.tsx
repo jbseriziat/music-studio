@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useDrumStore } from '../../stores/drumStore';
+import { DrumPad } from './DrumPad';
 import { StepCell } from './StepCell';
 import styles from './StepRow.module.css';
 
@@ -18,11 +19,10 @@ export function StepRow({
   padIndex, padName, padIcon, padColor,
   steps, velocities, stepCount, currentStep,
 }: Props) {
-  const { triggerPad, toggleStep } = useDrumStore();
+  const { toggleStep, padVolumes, padPitches } = useDrumStore();
 
-  const handlePadClick = useCallback(() => {
-    triggerPad(padIndex);
-  }, [triggerPad, padIndex]);
+  const volume = padVolumes[padIndex] ?? 1.0;
+  const pitch  = padPitches[padIndex] ?? 0.0;
 
   const handleStepClick = useCallback((stepIdx: number) => {
     toggleStep(padIndex, stepIdx);
@@ -30,19 +30,17 @@ export function StepRow({
 
   return (
     <div className={styles.row}>
-      {/* ─── Bouton pad ─────────────────────────────────────────────────── */}
-      <button
-        className={styles.padBtn}
-        style={{ '--pad-color': padColor } as React.CSSProperties}
-        onClick={handlePadClick}
-        title={`Jouer ${padName}`}
-        aria-label={padName}
-      >
-        <span className={styles.padIcon}>{padIcon}</span>
-        <span className={styles.padName}>{padName}</span>
-      </button>
+      {/* ─── Pad : déclenchement + réglages (volume, pitch, sample) ────── */}
+      <DrumPad
+        padIndex={padIndex}
+        padName={padName}
+        padIcon={padIcon}
+        padColor={padColor}
+        volume={volume}
+        pitch={pitch}
+      />
 
-      {/* ─── Cellules de step ───────────────────────────────────────────── */}
+      {/* ─── Cellules de step ─────────────────────────────────────────── */}
       <div className={styles.cells}>
         {Array.from({ length: stepCount }, (_, i) => (
           <StepCell

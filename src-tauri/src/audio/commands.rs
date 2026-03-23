@@ -65,4 +65,10 @@ pub enum AudioCommand {
 
     /// Remplace tout le pattern d'un coup (chargement de projet, preset).
     SetDrumPattern { pattern: crate::drums::DrumPattern },
+
+    /// Ajuste le volume d'un pad du drum rack (0.0–2.0). Applied at trigger time.
+    SetDrumPadVolume { pad: u8, volume: f32 },
+
+    /// Transpose un pad du drum rack en demi-tons (−12 à +12).
+    SetDrumPadPitch { pad: u8, pitch_semitones: f32 },
 }

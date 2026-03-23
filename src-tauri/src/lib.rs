@@ -19,8 +19,9 @@ use commands::audio_commands::{
     set_position, stop,
 };
 use commands::drum_commands::{
-    assign_drum_pad, get_bpm, get_current_step, set_bpm, set_drum_pattern, set_drum_step,
-    set_drum_step_count, set_metronome, trigger_drum_pad,
+    assign_drum_pad, get_bpm, get_current_step, list_drum_kits, load_drum_kit, set_bpm,
+    set_drum_pad_pitch, set_drum_pad_volume, set_drum_pattern, set_drum_step, set_drum_step_count,
+    set_metronome, trigger_drum_pad,
 };
 use commands::project_commands::{
     delete_project, get_project_path, get_projects_dir, list_projects, load_project, new_project,
@@ -111,6 +112,10 @@ pub fn run() {
             get_current_step,
             set_drum_step_count,
             set_drum_pattern,
+            set_drum_pad_volume,
+            set_drum_pad_pitch,
+            load_drum_kit,
+            list_drum_kits,
             // Settings
             get_audio_devices,
             get_profiles,

@@ -1,6 +1,7 @@
 import { useDrumStore } from '../../stores/drumStore';
 import { useDrumSequencer } from '../../hooks/useDrumSequencer';
 import { StepSequencer } from './StepSequencer';
+import { DrumKitSelector } from './DrumKitSelector';
 import styles from './DrumRack.module.css';
 
 /** Kits prédéfinis : patterns simples prêts à l'emploi. */
@@ -50,7 +51,10 @@ export function DrumRack() {
           ))}
         </div>
 
-        {/* Presets */}
+        {/* Sélecteur de kit */}
+        <DrumKitSelector />
+
+        {/* Presets de patterns */}
         <div className={styles.presets}>
           {PRESETS.map((p) => (
             <button

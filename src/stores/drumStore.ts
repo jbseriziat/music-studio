@@ -5,6 +5,9 @@ import {
   triggerDrumPadCmd,
   setDrumStepCount,
   setDrumPattern,
+  setDrumPadVolume,
+  setDrumPadPitch,
+  loadDrumKitCmd,
   type DrumPatternDto,
 } from '../utils/tauri-commands';
 import { PAD_COLORS } from './padsStore';
@@ -47,6 +50,10 @@ interface DrumState {
   // ─── Config des pads ──────────────────────────────────────────────────────
   pads: DrumPadConfig[];
 
+  // ─── Volume et pitch par pad ──────────────────────────────────────────────
+  padVolumes: number[]; // [0.0–2.0] × 8
+  padPitches: number[]; // [−12–+12] × 8
+
   // ─── Curseur de lecture (mis à jour par polling) ───────────────────────────
   currentStep: number;
 
@@ -56,6 +63,12 @@ interface DrumState {
   assignPad: (pad: number, sampleId: number, sampleName: string) => void;
   triggerPad: (pad: number) => void;
   setCurrentStep: (step: number) => void;
+  /** Ajuste le volume d'un pad (0.0–2.0). */
+  setPadVolume: (pad: number, volume: number) => void;
+  /** Transpose un pad en demi-tons (−12 à +12). */
+  setPadPitch: (pad: number, pitch: number) => void;
+  /** Charge un kit prédéfini depuis le moteur audio. */
+  loadKit: (kitName: string) => Promise<void>;
   /** Applique un pattern complet (chargement projet/preset). */
   applyPattern: (pattern: DrumPatternDto) => void;
   /** Réinitialise le pattern (tous les steps à false). */
@@ -88,6 +101,8 @@ export const useDrumStore = create<DrumState>()((set, get) => ({
   velocities: makeDefaultVelocities(),
   stepCount: 16,
   pads: makeDefaultPads(),
+  padVolumes: Array(DRUM_PAD_COUNT).fill(1.0),
+  padPitches: Array(DRUM_PAD_COUNT).fill(0.0),
   currentStep: 0,
 
   toggleStep: (pad, step) => {
@@ -129,6 +144,46 @@ export const useDrumStore = create<DrumState>()((set, get) => ({
   },
 
   setCurrentStep: (step) => set({ currentStep: step }),
+
+  setPadVolume: (pad, volume) => {
+    const v = Math.max(0.0, Math.min(2.0, volume));
+    set((s) => {
+      const next = [...s.padVolumes];
+      next[pad] = v;
+      return { padVolumes: next };
+    });
+    setDrumPadVolume(pad, v).catch((e) =>
+      console.error('[DrumStore] setPadVolume error', e)
+    );
+  },
+
+  setPadPitch: (pad, pitch) => {
+    const p = Math.max(-12, Math.min(12, Math.round(pitch)));
+    set((s) => {
+      const next = [...s.padPitches];
+      next[pad] = p;
+      return { padPitches: next };
+    });
+    setDrumPadPitch(pad, p).catch((e) =>
+      console.error('[DrumStore] setPadPitch error', e)
+    );
+  },
+
+  loadKit: async (kitName) => {
+    try {
+      const padConfigs = await loadDrumKitCmd(kitName);
+      const newPads = get().pads.map((p, i) => {
+        const cfg = padConfigs[i];
+        if (!cfg) return p;
+        return { ...p, sampleId: cfg.sample_id, sampleName: cfg.name };
+      });
+      const newVolumes = padConfigs.map((c) => c.volume);
+      const newPitches = padConfigs.map((c) => c.pitch_semitones);
+      set({ pads: newPads, padVolumes: newVolumes, padPitches: newPitches });
+    } catch (e) {
+      console.error('[DrumStore] loadKit error', e);
+    }
+  },
 
   applyPattern: (pattern) => {
     const newSteps = makeEmptySteps();

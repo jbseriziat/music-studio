@@ -207,3 +207,33 @@ export const setDrumStepCount = (count: number): Promise<void> =>
 /** Remplace tout le pattern d'un coup (chargement projet/preset). */
 export const setDrumPattern = (pattern: DrumPatternDto): Promise<void> =>
   invoke<void>('set_drum_pattern', { pattern });
+
+// ─── Kits & réglages par pad ──────────────────────────────────────────────────
+
+export interface DrumKitInfo {
+  name: string;
+  display_name: string;
+}
+
+export interface DrumPadConfigDto {
+  sample_id: number;
+  volume: number;
+  pitch_semitones: number;
+  name: string;
+}
+
+/** Ajuste le volume d'un pad (0.0–2.0). */
+export const setDrumPadVolume = (pad: number, volume: number): Promise<void> =>
+  invoke<void>('set_drum_pad_volume', { pad, volume });
+
+/** Transpose un pad en demi-tons (−12 à +12). */
+export const setDrumPadPitch = (pad: number, pitchSemitones: number): Promise<void> =>
+  invoke<void>('set_drum_pad_pitch', { pad, pitchSemitones });
+
+/** Charge un kit prédéfini. Retourne les 8 configs de pads mises à jour. */
+export const loadDrumKitCmd = (kitName: string): Promise<DrumPadConfigDto[]> =>
+  invoke<DrumPadConfigDto[]>('load_drum_kit', { kitName });
+
+/** Retourne la liste des kits intégrés. */
+export const listDrumKits = (): Promise<DrumKitInfo[]> =>
+  invoke<DrumKitInfo[]>('list_drum_kits');

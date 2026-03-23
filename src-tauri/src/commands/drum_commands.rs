@@ -113,3 +113,56 @@ pub fn set_drum_pattern(
         .send_command(AudioCommand::SetDrumPattern { pattern });
     Ok(())
 }
+
+/// Ajuste le volume d'un pad du drum rack (0.0 = silence, 1.0 = nominal, 2.0 = +6 dB).
+#[tauri::command]
+pub fn set_drum_pad_volume(
+    pad: u8,
+    volume: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine
+        .inner()
+        .lock()
+        .map_err(|e| e.to_string())?
+        .send_command(AudioCommand::SetDrumPadVolume { pad, volume });
+    Ok(())
+}
+
+/// Transpose un pad du drum rack en demi-tons (−12 à +12).
+#[tauri::command]
+pub fn set_drum_pad_pitch(
+    pad: u8,
+    pitch_semitones: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine
+        .inner()
+        .lock()
+        .map_err(|e| e.to_string())?
+        .send_command(AudioCommand::SetDrumPadPitch { pad, pitch_semitones });
+    Ok(())
+}
+
+/// Charge un kit prédéfini : met à jour les samples, volumes et pitchs des 8 pads.
+/// Retourne les configs mises à jour (sampleId, volume, pitch, name) pour le frontend.
+#[tauri::command]
+pub fn load_drum_kit(
+    kit_name: String,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<Vec<crate::drums::DrumPadConfig>, String> {
+    let pads = crate::drums::kit_pads(&kit_name);
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    for (i, pad) in pads.iter().enumerate() {
+        eng.send_command(AudioCommand::AssignDrumPad    { pad: i as u8, sample_id: pad.sample_id });
+        eng.send_command(AudioCommand::SetDrumPadVolume { pad: i as u8, volume: pad.volume });
+        eng.send_command(AudioCommand::SetDrumPadPitch  { pad: i as u8, pitch_semitones: pad.pitch_semitones });
+    }
+    Ok(pads)
+}
+
+/// Retourne la liste des kits de batterie intégrés.
+#[tauri::command]
+pub fn list_drum_kits() -> Result<Vec<crate::drums::DrumKitInfo>, String> {
+    Ok(crate::drums::built_in_kits())
+}

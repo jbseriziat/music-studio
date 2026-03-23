@@ -62,6 +62,56 @@ impl Voice {
     }
 }
 
+// ─── Voix de drum rack avec pitch (interpolation linéaire) ───────────────────
+struct PitchedVoice {
+    sample_id: u32,
+    /// Position fractionnaire dans le sample (avance de `pitch_ratio` par frame).
+    position: f64,
+    /// Facteur de vélocité × volume du pad (0.0–2.0).
+    velocity: f32,
+    /// 2^(semitones/12) — 1.0 = normal, 2.0 = +1 octave, 0.5 = −1 octave.
+    pitch_ratio: f64,
+}
+
+impl PitchedVoice {
+    fn next_stereo(&mut self, samples: &[Option<SampleData>]) -> (f32, f32) {
+        let Some(Some(sd)) = samples.get(self.sample_id as usize) else {
+            return (0.0, 0.0);
+        };
+        let num_frames = sd.frames.len() / sd.channels as usize;
+        let ipos = self.position as usize;
+        if ipos >= num_frames {
+            return (0.0, 0.0);
+        }
+        let frac = (self.position - ipos as f64) as f32;
+        let base = ipos * sd.channels as usize;
+        let next_base = if ipos + 1 < num_frames {
+            (ipos + 1) * sd.channels as usize
+        } else {
+            base
+        };
+        let l = (sd.frames[base]     + (sd.frames[next_base]     - sd.frames[base])     * frac) * self.velocity;
+        let r = if sd.channels > 1 {
+            let b1 = base + 1;
+            let n1 = next_base + 1;
+            (sd.frames[b1] + (sd.frames[n1] - sd.frames[b1]) * frac) * self.velocity
+        } else {
+            l
+        };
+        self.position += self.pitch_ratio;
+        (l, r)
+    }
+
+    fn is_done(&self, samples: &[Option<SampleData>]) -> bool {
+        match samples.get(self.sample_id as usize) {
+            Some(Some(sd)) => {
+                self.position as usize >= sd.frames.len() / sd.channels as usize
+            }
+            _ => true,
+        }
+    }
+}
+
 // ─── Clip sur la timeline ─────────────────────────────────────────────────────
 struct TimelineClip {
     id: u32,
@@ -110,8 +160,12 @@ struct AudioCallbackState {
     drum_pad_velocities: [[f32; 32]; 8],
     /// Sample assigné à chaque pad du drum rack (index 0–7).
     drum_pad_samples: [u32; 8],
-    /// Voix de drum rack actives. Pré-alloué à 64.
-    drum_voices: Vec<Voice>,
+    /// Volume par pad (0.0–2.0). Multiplié à la vélocité au déclenchement.
+    drum_pad_volumes: [f32; 8],
+    /// Transposition en demi-tons par pad (−12.0 à +12.0).
+    drum_pad_pitches: [f32; 8],
+    /// Voix de drum rack actives (avec pitch). Pré-alloué à 64.
+    drum_voices: Vec<PitchedVoice>,
 
     // ─── Métronome ────────────────────────────────────────────────────────────
     metronome_enabled: bool,
@@ -250,7 +304,19 @@ impl AudioCallbackState {
                 let p = pad as usize;
                 if p < 8 && self.drum_voices.len() < 64 {
                     let sample_id = self.drum_pad_samples[p];
-                    self.drum_voices.push(Voice { sample_id, position: 0, velocity: 1.0 });
+                    let velocity  = self.drum_pad_volumes[p].clamp(0.0, 2.0);
+                    let pitch_ratio = 2.0f64.powf(self.drum_pad_pitches[p] as f64 / 12.0);
+                    self.drum_voices.push(PitchedVoice { sample_id, position: 0.0, velocity, pitch_ratio });
+                }
+            }
+            AudioCommand::SetDrumPadVolume { pad, volume } => {
+                if (pad as usize) < 8 {
+                    self.drum_pad_volumes[pad as usize] = volume.clamp(0.0, 2.0);
+                }
+            }
+            AudioCommand::SetDrumPadPitch { pad, pitch_semitones } => {
+                if (pad as usize) < 8 {
+                    self.drum_pad_pitches[pad as usize] = pitch_semitones.clamp(-12.0, 12.0);
                 }
             }
             AudioCommand::SetMetronome { enabled } => {
@@ -395,6 +461,8 @@ impl AudioEngine {
             drum_pad_velocities: [[1.0; 32]; 8],
             // Mapping par défaut : kick, snare, hihat, hihat_open, clap, tomH, tomB, snare2
             drum_pad_samples: [0, 2, 4, 5, 6, 7, 8, 3],
+            drum_pad_volumes: [1.0f32; 8],
+            drum_pad_pitches: [0.0f32; 8],
             drum_voices: Vec::with_capacity(64),
             metronome_enabled: false,
             metronome_voice: None,
@@ -492,9 +560,12 @@ impl AudioEngine {
                                 for pad in 0..8usize {
                                     if state.drum_pad_steps[pad][state.sequencer_step] {
                                         if state.drum_voices.len() < 64 {
-                                            let sid = state.drum_pad_samples[pad];
-                                            let vel = state.drum_pad_velocities[pad][state.sequencer_step];
-                                            state.drum_voices.push(Voice { sample_id: sid, position: 0, velocity: vel });
+                                            let sid        = state.drum_pad_samples[pad];
+                                            let pattern_vel = state.drum_pad_velocities[pad][state.sequencer_step];
+                                            let pad_vol    = state.drum_pad_volumes[pad];
+                                            let velocity   = (pattern_vel * pad_vol).clamp(0.0, 2.0);
+                                            let pitch_ratio = 2.0f64.powf(state.drum_pad_pitches[pad] as f64 / 12.0);
+                                            state.drum_voices.push(PitchedVoice { sample_id: sid, position: 0.0, velocity, pitch_ratio });
                                         }
                                     }
                                 }
@@ -508,7 +579,7 @@ impl AudioEngine {
                             }
                         }
 
-                        // ── Voix de drum rack ──────────────────────────────────
+                        // ── Voix de drum rack (avec pitch) ─────────────────────
                         for voice in &mut state.drum_voices {
                             let (l, r) = voice.next_stereo(&state.samples);
                             left += l;
