@@ -36,6 +36,8 @@ export interface MspProject {
   bpm: number;
   tracks: ProjectTrack[];
   pads: ProjectPad[];
+  /** Pattern du drum rack, absent dans les anciens projets. */
+  drum_pattern?: DrumPatternDto;
 }
 
 export interface ProjectTrack {
@@ -47,6 +49,8 @@ export interface ProjectTrack {
   muted: boolean;
   solo: boolean;
   clips: ProjectClip[];
+  /** Type de la piste : "audio" | "drum_rack" | "instrument". Absent = "audio". */
+  track_type?: string;
 }
 
 export interface ProjectClip {
@@ -92,8 +96,25 @@ export const addClipCmd = (
   sampleId: number,
   positionSecs: number,
   durationSecs: number,
+  trackId: number,
 ): Promise<void> =>
-  invoke<void>('add_clip', { clipId, sampleId, positionSecs, durationSecs });
+  invoke<void>('add_clip', { clipId, sampleId, positionSecs, durationSecs, trackId });
+
+/** Configure la zone de boucle (en secondes). */
+export const setLoopCmd = (enabled: boolean, startSecs: number, endSecs: number): Promise<void> =>
+  invoke<void>('set_loop', { enabled, startSecs, endSecs });
+
+/** Active/désactive le mute d'une piste (trackId = index 0-based). */
+export const setTrackMuteCmd = (trackId: number, muted: boolean): Promise<void> =>
+  invoke<void>('set_track_mute', { trackId, muted });
+
+/** Active/désactive le solo d'une piste. */
+export const setTrackSoloCmd = (trackId: number, solo: boolean): Promise<void> =>
+  invoke<void>('set_track_solo', { trackId, solo });
+
+/** Ajuste le volume du métronome (0.0–1.0). */
+export const setMetronomeVolumeCmd = (volume: number): Promise<void> =>
+  invoke<void>('set_metronome_volume', { volume });
 
 export const moveClipCmd = (clipId: number, newPositionSecs: number): Promise<void> =>
   invoke<void>('move_clip', { clipId, newPositionSecs });
@@ -163,3 +184,77 @@ export const getProjectPath = (name: string): Promise<string> =>
 
 export const deleteProjectFile = (path: string): Promise<void> =>
   invoke<void>('delete_project', { path });
+
+// ─── Drum Rack & Séquenceur ───────────────────────────────────────────────────
+
+export interface DrumPatternDto {
+  steps: number;
+  pads: boolean[][];        // [pad][step]
+  velocities: number[][];   // [pad][step]
+}
+
+/** Définit le BPM (20–300). */
+export const setBpmCmd = (bpm: number): Promise<void> =>
+  invoke<void>('set_bpm', { bpm });
+
+/** Retourne le BPM actuel depuis le moteur audio. */
+export const getBpm = (): Promise<number> =>
+  invoke<number>('get_bpm');
+
+/** Active ou désactive un step pour un pad. velocity ∈ [0.0, 1.0]. */
+export const setDrumStep = (pad: number, step: number, active: boolean, velocity = 1.0): Promise<void> =>
+  invoke<void>('set_drum_step', { pad, step, active, velocity });
+
+/** Assigne un sample à un pad du drum rack. */
+export const assignDrumPad = (pad: number, sampleId: number): Promise<void> =>
+  invoke<void>('assign_drum_pad', { pad, sampleId });
+
+/** Déclenche immédiatement un pad du drum rack. */
+export const triggerDrumPadCmd = (pad: number): Promise<void> =>
+  invoke<void>('trigger_drum_pad', { pad });
+
+/** Active ou désactive le métronome. */
+export const setMetronomeCmd = (enabled: boolean): Promise<void> =>
+  invoke<void>('set_metronome', { enabled });
+
+/** Retourne le step courant du séquenceur (0–31). */
+export const getCurrentStep = (): Promise<number> =>
+  invoke<number>('get_current_step');
+
+/** Définit le nombre de steps du pattern (8, 16, 32). */
+export const setDrumStepCount = (count: number): Promise<void> =>
+  invoke<void>('set_drum_step_count', { count });
+
+/** Remplace tout le pattern d'un coup (chargement projet/preset). */
+export const setDrumPattern = (pattern: DrumPatternDto): Promise<void> =>
+  invoke<void>('set_drum_pattern', { pattern });
+
+// ─── Kits & réglages par pad ──────────────────────────────────────────────────
+
+export interface DrumKitInfo {
+  name: string;
+  display_name: string;
+}
+
+export interface DrumPadConfigDto {
+  sample_id: number;
+  volume: number;
+  pitch_semitones: number;
+  name: string;
+}
+
+/** Ajuste le volume d'un pad (0.0–2.0). */
+export const setDrumPadVolume = (pad: number, volume: number): Promise<void> =>
+  invoke<void>('set_drum_pad_volume', { pad, volume });
+
+/** Transpose un pad en demi-tons (−12 à +12). */
+export const setDrumPadPitch = (pad: number, pitchSemitones: number): Promise<void> =>
+  invoke<void>('set_drum_pad_pitch', { pad, pitchSemitones });
+
+/** Charge un kit prédéfini. Retourne les 8 configs de pads mises à jour. */
+export const loadDrumKitCmd = (kitName: string): Promise<DrumPadConfigDto[]> =>
+  invoke<DrumPadConfigDto[]>('load_drum_kit', { kitName });
+
+/** Retourne la liste des kits intégrés. */
+export const listDrumKits = (): Promise<DrumKitInfo[]> =>
+  invoke<DrumKitInfo[]>('list_drum_kits');

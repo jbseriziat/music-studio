@@ -36,3 +36,30 @@
   white-space: nowrap;
   pointer-events: none;
 }
+
+/* ─── Zone de boucle ──────────────────────────────────────────────────────── */
+.loopZone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 152, 0, 0.18);
+  border-top: 2px solid #FF9800;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.loopMarker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: #FF9800;
+  cursor: ew-resize;
+  z-index: 2;
+  border-radius: 0 2px 2px 0;
+  transform: translateX(-3px);
+}
+
+.loopMarker:hover {
+  background: #FFB74D;
+}

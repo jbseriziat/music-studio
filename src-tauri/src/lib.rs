@@ -15,8 +15,13 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 use commands::audio_commands::{
-    add_clip, clear_timeline, delete_clip, move_clip, pause, ping_audio, play, set_master_volume,
-    set_position, stop,
+    add_clip, clear_timeline, delete_clip, move_clip, pause, ping_audio, play, set_loop,
+    set_master_volume, set_metronome_volume, set_position, set_track_mute, set_track_solo, stop,
+};
+use commands::drum_commands::{
+    assign_drum_pad, get_bpm, get_current_step, list_drum_kits, load_drum_kit, set_bpm,
+    set_drum_pad_pitch, set_drum_pad_volume, set_drum_pattern, set_drum_step, set_drum_step_count,
+    set_metronome, trigger_drum_pad,
 };
 use commands::project_commands::{
     delete_project, get_project_path, get_projects_dir, list_projects, load_project, new_project,
@@ -83,11 +88,15 @@ pub fn run() {
             set_master_volume,
             ping_audio,
             set_position,
-            // Clips
+            // Clips & transport avancé
             add_clip,
             move_clip,
             delete_clip,
             clear_timeline,
+            set_loop,
+            set_track_mute,
+            set_track_solo,
+            set_metronome_volume,
             // Samples & pads
             trigger_pad,
             assign_pad_sample,
@@ -97,6 +106,20 @@ pub fn run() {
             stop_preview,
             get_position,
             get_pad_config,
+            // Drum rack & séquenceur
+            set_bpm,
+            get_bpm,
+            set_drum_step,
+            assign_drum_pad,
+            trigger_drum_pad,
+            set_metronome,
+            get_current_step,
+            set_drum_step_count,
+            set_drum_pattern,
+            set_drum_pad_volume,
+            set_drum_pad_pitch,
+            load_drum_kit,
+            list_drum_kits,
             // Settings
             get_audio_devices,
             get_profiles,

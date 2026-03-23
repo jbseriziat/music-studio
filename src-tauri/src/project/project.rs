@@ -10,6 +10,9 @@ pub struct MspProject {
     pub bpm: f64,
     pub tracks: Vec<ProjectTrack>,
     pub pads: Vec<ProjectPad>,
+    /// Pattern du drum rack (None si pas encore créé / niveau 1).
+    #[serde(default)]
+    pub drum_pattern: Option<ProjectDrumPattern>,
 }
 
 impl MspProject {
@@ -22,6 +25,7 @@ impl MspProject {
             bpm: 120.0,
             tracks: Vec::new(),
             pads: Self::default_pads(),
+            drum_pattern: None,
         }
     }
 
@@ -45,6 +49,19 @@ pub struct ProjectTrack {
     pub muted: bool,
     pub solo: bool,
     pub clips: Vec<ProjectClip>,
+    /// Type de piste : "audio", "drum_rack", "instrument". Absent dans les vieux projets → "audio".
+    #[serde(default)]
+    pub track_type: Option<String>,
+}
+
+/// Snapshot du pattern du drum rack dans le projet.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectDrumPattern {
+    pub steps: u8,
+    /// pads[pad_index][step_index] = actif
+    pub pads: Vec<Vec<bool>>,
+    /// velocities[pad_index][step_index] = 0.0–1.0
+    pub velocities: Vec<Vec<f32>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

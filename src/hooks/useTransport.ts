@@ -29,10 +29,9 @@ export function useTransport() {
     }
   }, [store]);
 
-  /** Met à jour le BPM dans le store (IPC Phase 2+). */
+  /** Met à jour le BPM dans le store + IPC (délégué au store). */
   const setBpm = useCallback((bpm: number) => {
     store.setBpm(bpm);
-    // TODO Phase 2 : invoke('set_bpm', { bpm })
   }, [store]);
 
   /** Ajuste le volume master via IPC. */

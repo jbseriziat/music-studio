@@ -17,3 +17,35 @@
   min-height: 0;
   overflow: hidden;
 }
+
+/* ── Onglets Pads / Drum Rack ─────────────────────────────────────────────── */
+
+.tabBar {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 0 0.75rem;
+}
+
+.tab {
+  padding: 0.4rem 1.2rem;
+  border-radius: 20px;
+  border: 2px solid var(--color-border-strong, #35355a);
+  background: var(--color-overlay, #1a1a2e);
+  color: var(--color-text-secondary, #a0a0c0);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.tab:hover {
+  background: var(--color-accent-glow, rgba(74, 144, 226, 0.15));
+  border-color: var(--color-accent, #4a90e2);
+  color: var(--color-text, #e8e8f0);
+}
+
+.tabActive {
+  background: var(--color-accent, #4a90e2);
+  border-color: var(--color-accent, #4a90e2);
+  color: #fff;
+}

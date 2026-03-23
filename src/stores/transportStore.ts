@@ -1,5 +1,8 @@
 import { create } from 'zustand';
-import { playAudio, pauseAudio, stopAudio, getPosition } from '../utils/tauri-commands';
+import {
+  playAudio, pauseAudio, stopAudio, getPosition,
+  setBpmCmd, setMetronomeCmd, setLoopCmd, setMetronomeVolumeCmd,
+} from '../utils/tauri-commands';
 
 interface TransportState {
   // ─── État ─────────────────────────────────────────────────────────────────
@@ -12,6 +15,8 @@ interface TransportState {
   loopStart: number;  // en secondes
   loopEnd: number;    // en secondes
   metronomeEnabled: boolean;
+  /** Volume du métronome : 0.0–1.0. */
+  metronomeVolume: number;
 
   // ─── Actions IPC (appellent le backend Rust) ──────────────────────────────
   /** Démarre la lecture. */
@@ -30,6 +35,7 @@ interface TransportState {
   setPosition: (position: number) => void;
   setLoop: (enabled: boolean, start?: number, end?: number) => void;
   toggleMetronome: () => void;
+  setMetronomeVolume: (volume: number) => void;
 }
 
 export const useTransportStore = create<TransportState>()((set) => ({
@@ -41,6 +47,7 @@ export const useTransportStore = create<TransportState>()((set) => ({
   loopStart: 0,
   loopEnd: 8,
   metronomeEnabled: false,
+  metronomeVolume: 0.6,
 
   // ─── Actions IPC ──────────────────────────────────────────────────────────
 
@@ -84,13 +91,32 @@ export const useTransportStore = create<TransportState>()((set) => ({
 
   setPlaying: (isPlaying) => set({ isPlaying }),
   setRecording: (isRecording) => set({ isRecording }),
-  setBpm: (bpm) => set({ bpm: Math.max(40, Math.min(240, bpm)) }),
+  setBpm: (bpm) => {
+    const clamped = Math.max(40, Math.min(240, bpm));
+    set({ bpm: clamped });
+    setBpmCmd(clamped).catch((e) => console.error('[TransportStore] setBpm error', e));
+  },
   setPosition: (position) => set({ position }),
   setLoop: (loopEnabled, loopStart, loopEnd) =>
-    set((s) => ({
-      loopEnabled,
-      loopStart: loopStart ?? s.loopStart,
-      loopEnd: loopEnd ?? s.loopEnd,
-    })),
-  toggleMetronome: () => set((s) => ({ metronomeEnabled: !s.metronomeEnabled })),
+    set((s) => {
+      const start = loopStart ?? s.loopStart;
+      const end   = loopEnd   ?? s.loopEnd;
+      setLoopCmd(loopEnabled, start, end).catch(
+        (e) => console.error('[TransportStore] setLoop error', e),
+      );
+      return { loopEnabled, loopStart: start, loopEnd: end };
+    }),
+  toggleMetronome: () =>
+    set((s) => {
+      const enabled = !s.metronomeEnabled;
+      setMetronomeCmd(enabled).catch((e) => console.error('[TransportStore] setMetronome error', e));
+      return { metronomeEnabled: enabled };
+    }),
+  setMetronomeVolume: (volume) => {
+    const clamped = Math.max(0, Math.min(1, volume));
+    set({ metronomeVolume: clamped });
+    setMetronomeVolumeCmd(clamped).catch(
+      (e) => console.error('[TransportStore] setMetronomeVolume error', e),
+    );
+  },
 }));

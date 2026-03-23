@@ -1,0 +1,7 @@
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: max-content;
+  position: relative; /* Ancre pour StepCursor en position absolue */
+}
