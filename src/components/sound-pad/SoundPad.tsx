@@ -12,9 +12,13 @@ interface Props {
   icon: string;
   sampleName: string;
   sampleId: number | null;
+  /** Durée du sample assigné (ms). Null si inconnu. */
+  durationMs?: number | null;
+  /** Données de forme d'onde pré-calculées (128 points normalisés). */
+  waveform?: number[];
 }
 
-export function SoundPad({ id, color, textColor = '#fff', icon, sampleName, sampleId }: Props) {
+export function SoundPad({ id, color, textColor = '#fff', icon, sampleName, sampleId, durationMs = null, waveform = [] }: Props) {
   const [isTriggered, setIsTriggered] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -34,10 +38,17 @@ export function SoundPad({ id, color, textColor = '#fff', icon, sampleName, samp
     if (sampleId === null) return;
     e.dataTransfer.setData(
       'application/json',
-      JSON.stringify({ type: 'pad', sampleId, sampleName })
+      JSON.stringify({
+        type: 'pad',
+        sampleId,
+        sampleName,
+        // Inclure durée et waveform pour un clip correct sur la timeline
+        durationMs: durationMs ?? undefined,
+        waveform: waveform.length > 0 ? waveform : undefined,
+      })
     );
     e.dataTransfer.effectAllowed = 'copy';
-  }, [sampleId, sampleName]);
+  }, [sampleId, sampleName, durationMs, waveform]);
 
   /** Accepter les drops de samples depuis le SampleBrowser. */
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -58,9 +69,11 @@ export function SoundPad({ id, color, textColor = '#fff', icon, sampleName, samp
         type: string;
         sampleId?: number;
         sampleName?: string;
+        durationMs?: number;
+        waveform?: number[];
       };
       if (data.type === 'sample' && typeof data.sampleId === 'number') {
-        assignPadSample(id, data.sampleId, data.sampleName ?? `Sample ${data.sampleId}`);
+        assignPadSample(id, data.sampleId, data.sampleName ?? `Sample ${data.sampleId}`, data.durationMs, data.waveform);
       }
     } catch {
       // Données drag invalides — ignorer silencieusement
@@ -133,8 +146,8 @@ export function SoundPad({ id, color, textColor = '#fff', icon, sampleName, samp
         padId={id}
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        onSelect={(newSampleId, newSampleName) =>
-          assignPadSample(id, newSampleId, newSampleName)
+        onSelect={(newSampleId, newSampleName, newDurationMs, newWaveform) =>
+          assignPadSample(id, newSampleId, newSampleName, newDurationMs, newWaveform)
         }
       />
     </div>

@@ -45,16 +45,20 @@ export interface PadConfig {
   color: string;
   textColor: string;
   icon: string;
+  /** Durée du sample assigné (ms). Null si inconnu. */
+  durationMs: number | null;
+  /** Données de forme d'onde pré-calculées (128 points normalisés). */
+  waveform: number[];
 }
 
 interface PadsState {
   pads: PadConfig[];
   /** Met à jour le sample associé à un pad (store + IPC backend). */
-  assignPadSample: (padId: number, sampleId: number, sampleName: string) => void;
+  assignPadSample: (padId: number, sampleId: number, sampleName: string, durationMs?: number, waveform?: number[]) => void;
   /** Déclenche la lecture du pad (IPC backend). */
   triggerPad: (padId: number) => Promise<void>;
   /** Met à jour le nom / sampleId d'un pad sans notifier le backend (utilisé au chargement). */
-  setPadName: (padId: number, sampleId: number | null, sampleName: string) => void;
+  setPadName: (padId: number, sampleId: number | null, sampleName: string, durationMs?: number, waveform?: number[]) => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -67,12 +71,22 @@ export const usePadsStore = create<PadsState>()((set, get) => ({
     color: PAD_COLORS[i],
     textColor: PAD_TEXT_COLORS[i],
     icon: DEFAULT_ICONS[i],
+    durationMs: null,
+    waveform: [],
   })),
 
-  assignPadSample: (padId, sampleId, sampleName) => {
+  assignPadSample: (padId, sampleId, sampleName, durationMs, waveform) => {
     set((s) => ({
       pads: s.pads.map((p) =>
-        p.id === padId ? { ...p, sampleId, sampleName } : p
+        p.id === padId
+          ? {
+              ...p,
+              sampleId,
+              sampleName,
+              durationMs: durationMs ?? p.durationMs,
+              waveform: waveform ?? p.waveform,
+            }
+          : p
       ),
     }));
     assignPadSampleCmd(padId, sampleId).catch((e) =>
@@ -92,10 +106,18 @@ export const usePadsStore = create<PadsState>()((set, get) => ({
     }
   },
 
-  setPadName: (padId, sampleId, sampleName) =>
+  setPadName: (padId, sampleId, sampleName, durationMs, waveform) =>
     set((s) => ({
       pads: s.pads.map((p) =>
-        p.id === padId ? { ...p, sampleId, sampleName } : p
+        p.id === padId
+          ? {
+              ...p,
+              sampleId,
+              sampleName,
+              durationMs: durationMs ?? p.durationMs,
+              waveform: waveform ?? p.waveform,
+            }
+          : p
       ),
     })),
 }));

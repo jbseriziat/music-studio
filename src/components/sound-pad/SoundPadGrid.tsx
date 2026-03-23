@@ -17,7 +17,7 @@ export function SoundPadGrid() {
         config.forEach((sampleId, i) => {
           const info = sampleId !== null ? sampleMap.get(sampleId) : null;
           const name = info?.name ?? (sampleId !== null ? `Sample ${sampleId}` : '—');
-          setPadName(i, sampleId, name);
+          setPadName(i, sampleId, name, info?.duration_ms, info?.waveform);
         });
       } catch (e) {
         console.error('[SoundPadGrid] loadPads error', e);
@@ -39,6 +39,8 @@ export function SoundPadGrid() {
           icon={pad.icon}
           sampleName={pad.sampleName}
           sampleId={pad.sampleId}
+          durationMs={pad.durationMs}
+          waveform={pad.waveform}
         />
       ))}
     </div>

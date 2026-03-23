@@ -9,7 +9,7 @@ interface Props {
   padId: number;
   open: boolean;
   onClose: () => void;
-  onSelect: (sampleId: number, sampleName: string) => void;
+  onSelect: (sampleId: number, sampleName: string, durationMs: number, waveform: number[]) => void;
 }
 
 export function SamplePickerDialog({ padId, open, onClose, onSelect }: Props) {
@@ -63,7 +63,7 @@ export function SamplePickerDialog({ padId, open, onClose, onSelect }: Props) {
                 key={sample.id}
                 className={styles.sampleBtn}
                 onClick={() => {
-                  onSelect(sample.id, sample.name);
+                  onSelect(sample.id, sample.name, sample.duration_ms, sample.waveform);
                   onClose();
                 }}
               >
