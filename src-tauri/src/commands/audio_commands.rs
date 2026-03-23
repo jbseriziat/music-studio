@@ -50,6 +50,7 @@ pub fn add_clip(
     sample_id: u32,
     position_secs: f64,
     duration_secs: f64,
+    track_id: u32,
     engine: State<Mutex<AudioEngine>>,
     sample_bank: State<Mutex<crate::sampler::SampleBank>>,
 ) -> Result<(), String> {
@@ -72,7 +73,56 @@ pub fn add_clip(
         sample_id,
         position_frames: (position_secs * sr) as u64,
         duration_frames: (duration_secs * sr) as u64,
+        track_id,
     });
+    Ok(())
+}
+
+/// Configure la zone de boucle de la timeline.
+#[tauri::command]
+pub fn set_loop(
+    enabled: bool,
+    start_secs: f64,
+    end_secs: f64,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    let sr = eng.config.sample_rate as f64;
+    eng.send_command(AudioCommand::SetLoop {
+        enabled,
+        start_frames: (start_secs * sr) as u64,
+        end_frames: (end_secs * sr) as u64,
+    });
+    Ok(())
+}
+
+/// Active/désactive le mute d'une piste (track_id = index 0-based).
+#[tauri::command]
+pub fn set_track_mute(track_id: u32, muted: bool, engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetTrackMute { track_id, muted },
+    );
+    Ok(())
+}
+
+/// Active/désactive le solo d'une piste.
+#[tauri::command]
+pub fn set_track_solo(track_id: u32, solo: bool, engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetTrackSolo { track_id, solo },
+    );
+    Ok(())
+}
+
+/// Ajuste le volume du métronome (0.0–1.0).
+#[tauri::command]
+pub fn set_metronome_volume(volume: f32, engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
+    if !(0.0..=1.0).contains(&volume) {
+        return Err(format!("Volume métronome invalide : {volume} (attendu 0.0–1.0)"));
+    }
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetMetronomeVolume { volume },
+    );
     Ok(())
 }
 

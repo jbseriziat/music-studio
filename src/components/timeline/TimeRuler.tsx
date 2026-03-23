@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useFeatureLevel } from '../../hooks/useFeatureLevel';
 import styles from './TimeRuler.module.css';
 
@@ -7,6 +8,14 @@ interface Props {
   scrollLeft?: number;
   /** BPM courant — utilisé au niveau 2+ pour l'affichage mesures/temps. */
   bpm?: number;
+  /** Active la zone de boucle orange. */
+  loopEnabled?: boolean;
+  /** Début de la boucle en secondes. */
+  loopStart?: number;
+  /** Fin de la boucle en secondes. */
+  loopEnd?: number;
+  /** Appelé quand l'utilisateur déplace un marqueur de boucle. */
+  onLoopChange?: (startSecs: number, endSecs: number) => void;
 }
 
 // ─── Niveau 1 : règle en secondes ────────────────────────────────────────────
@@ -14,9 +23,11 @@ interface Props {
 function SecondsRuler({
   totalSecs,
   pixelsPerSec,
+  children,
 }: {
   totalSecs: number;
   pixelsPerSec: number;
+  children?: React.ReactNode;
 }) {
   const step = 0.5;
   const marks: number[] = [];
@@ -36,6 +47,7 @@ function SecondsRuler({
           </div>
         );
       })}
+      {children}
     </div>
   );
 }
@@ -46,10 +58,12 @@ function BeatsRuler({
   totalSecs,
   pixelsPerSec,
   bpm,
+  children,
 }: {
   totalSecs: number;
   pixelsPerSec: number;
   bpm: number;
+  children?: React.ReactNode;
 }) {
   const secsPerBeat = 60.0 / bpm;
   const totalBeats = Math.ceil(totalSecs / secsPerBeat) + 1;
@@ -83,20 +97,107 @@ function BeatsRuler({
           </div>
         );
       })}
+      {children}
     </div>
+  );
+}
+
+// ─── Overlay zone de boucle ───────────────────────────────────────────────────
+
+function LoopOverlay({
+  loopStart,
+  loopEnd,
+  pixelsPerSec,
+  totalSecs,
+  onLoopChange,
+}: {
+  loopStart: number;
+  loopEnd: number;
+  pixelsPerSec: number;
+  totalSecs: number;
+  onLoopChange?: (startSecs: number, endSecs: number) => void;
+}) {
+  const left  = Math.max(0, loopStart) * pixelsPerSec;
+  const width = Math.max(0, loopEnd - loopStart) * pixelsPerSec;
+
+  const handleDragMarker = useCallback(
+    (isStart: boolean) => (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const origVal = isStart ? loopStart : loopEnd;
+
+      const onMove = (me: MouseEvent) => {
+        const delta = (me.clientX - startX) / pixelsPerSec;
+        const newVal = Math.max(0, Math.min(totalSecs, origVal + delta));
+        if (isStart) {
+          onLoopChange?.(Math.min(newVal, loopEnd - 0.1), loopEnd);
+        } else {
+          onLoopChange?.(loopStart, Math.max(newVal, loopStart + 0.1));
+        }
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    },
+    [loopStart, loopEnd, pixelsPerSec, totalSecs, onLoopChange],
+  );
+
+  return (
+    <>
+      <div className={styles.loopZone} style={{ left, width }} />
+      <div
+        className={styles.loopMarker}
+        style={{ left }}
+        onMouseDown={handleDragMarker(true)}
+        title="Début de boucle"
+      />
+      <div
+        className={styles.loopMarker}
+        style={{ left: left + width }}
+        onMouseDown={handleDragMarker(false)}
+        title="Fin de boucle"
+      />
+    </>
   );
 }
 
 // ─── Export principal ─────────────────────────────────────────────────────────
 
-export function TimeRuler({ totalSecs, pixelsPerSec, bpm = 120 }: Props) {
+export function TimeRuler({
+  totalSecs,
+  pixelsPerSec,
+  bpm = 120,
+  loopEnabled = false,
+  loopStart = 0,
+  loopEnd = 8,
+  onLoopChange,
+}: Props) {
   const { currentLevel } = useFeatureLevel();
+
+  const loopOverlay = loopEnabled ? (
+    <LoopOverlay
+      loopStart={loopStart}
+      loopEnd={loopEnd}
+      pixelsPerSec={pixelsPerSec}
+      totalSecs={totalSecs}
+      onLoopChange={onLoopChange}
+    />
+  ) : null;
 
   if (currentLevel >= 2) {
     return (
-      <BeatsRuler totalSecs={totalSecs} pixelsPerSec={pixelsPerSec} bpm={bpm} />
+      <BeatsRuler totalSecs={totalSecs} pixelsPerSec={pixelsPerSec} bpm={bpm}>
+        {loopOverlay}
+      </BeatsRuler>
     );
   }
 
-  return <SecondsRuler totalSecs={totalSecs} pixelsPerSec={pixelsPerSec} />;
+  return (
+    <SecondsRuler totalSecs={totalSecs} pixelsPerSec={pixelsPerSec}>
+      {loopOverlay}
+    </SecondsRuler>
+  );
 }

@@ -15,8 +15,8 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 use commands::audio_commands::{
-    add_clip, clear_timeline, delete_clip, move_clip, pause, ping_audio, play, set_master_volume,
-    set_position, stop,
+    add_clip, clear_timeline, delete_clip, move_clip, pause, ping_audio, play, set_loop,
+    set_master_volume, set_metronome_volume, set_position, set_track_mute, set_track_solo, stop,
 };
 use commands::drum_commands::{
     assign_drum_pad, get_bpm, get_current_step, list_drum_kits, load_drum_kit, set_bpm,
@@ -88,11 +88,15 @@ pub fn run() {
             set_master_volume,
             ping_audio,
             set_position,
-            // Clips
+            // Clips & transport avancé
             add_clip,
             move_clip,
             delete_clip,
             clear_timeline,
+            set_loop,
+            set_track_mute,
+            set_track_solo,
+            set_metronome_volume,
             // Samples & pads
             trigger_pad,
             assign_pad_sample,

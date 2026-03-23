@@ -11,6 +11,10 @@ pub enum AudioCommand {
     SetPosition { frames: u64 },
     SetMasterVolume(f32),
 
+    // ── Boucle ───────────────────────────────────────────────────────────────
+    /// Configure la zone de boucle de la timeline (en frames audio).
+    SetLoop { enabled: bool, start_frames: u64, end_frames: u64 },
+
     // ── Samples ──────────────────────────────────────────────────────────────
     /// Charge un sample dans la banque de l'audio thread.
     LoadSample {
@@ -34,6 +38,8 @@ pub enum AudioCommand {
         sample_id: u32,
         position_frames: u64,
         duration_frames: u64,
+        /// Index numérique de la piste (0-based) pour le mute/solo.
+        track_id: u32,
     },
     MoveClip {
         id: u32,
@@ -43,6 +49,12 @@ pub enum AudioCommand {
 
     /// Supprime tous les clips de la timeline (nouveau projet / chargement).
     ClearTimeline,
+
+    // ── Pistes : Mute / Solo ──────────────────────────────────────────────────
+    /// Active/désactive le mute d'une piste (track_id = index numérique 0-based).
+    SetTrackMute { track_id: u32, muted: bool },
+    /// Active/désactive le solo d'une piste.
+    SetTrackSolo { track_id: u32, solo: bool },
 
     // ── BPM & Drum Sequencer ──────────────────────────────────────────────────
     /// Met à jour le tempo (BPM). Recalcule immédiatement la durée d'un step.
@@ -59,6 +71,9 @@ pub enum AudioCommand {
 
     /// Active/désactive le métronome.
     SetMetronome { enabled: bool },
+
+    /// Ajuste le volume du métronome (0.0–1.0).
+    SetMetronomeVolume { volume: f32 },
 
     /// Modifie le nombre de steps du pattern (8, 16, 32).
     SetDrumStepCount { count: u8 },

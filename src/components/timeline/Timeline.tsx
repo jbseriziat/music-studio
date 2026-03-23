@@ -25,7 +25,11 @@ const TRACK_COLORS = ['#FF5722', '#2196F3', '#4CAF50', '#9C27B0', '#FF9800', '#0
 export function Timeline({ positionSecs }: Props) {
   const { tracks, clips, selectedClipId, addTrack, removeTrack, selectClip } = useTracksStore();
   const { currentLevel } = useFeatureLevel();
-  const bpm = useTransportStore((s) => s.bpm);
+  const bpm         = useTransportStore((s) => s.bpm);
+  const loopEnabled = useTransportStore((s) => s.loopEnabled);
+  const loopStart   = useTransportStore((s) => s.loopStart);
+  const loopEnd     = useTransportStore((s) => s.loopEnd);
+  const setLoop     = useTransportStore((s) => s.setLoop);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const tracksAreaRef = useRef<HTMLDivElement>(null);
@@ -113,6 +117,10 @@ export function Timeline({ positionSecs }: Props) {
                 pixelsPerSec={pixelsPerSec}
                 bpm={bpm}
                 scrollLeft={scrollRef.current?.scrollLeft ?? 0}
+                loopEnabled={loopEnabled}
+                loopStart={loopStart}
+                loopEnd={loopEnd}
+                onLoopChange={(s, e) => setLoop(loopEnabled, s, e)}
               />
             </div>
           </div>
@@ -128,12 +136,15 @@ export function Timeline({ positionSecs }: Props) {
               />
             </div>
 
-            {tracks.map((track) => (
+            {tracks.map((track, idx) => (
               <Track
                 key={track.id}
                 id={track.id}
+                trackIndex={idx}
                 name={track.name}
                 color={track.color}
+                muted={track.muted}
+                solo={track.solo}
                 clips={clips
                   .filter((c) => c.trackId === track.id)
                   .map((c) => ({

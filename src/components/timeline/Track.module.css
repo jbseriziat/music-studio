@@ -27,6 +27,49 @@
   flex: 1;
 }
 
+.muteBtn,
+.soloBtn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.muteBtn:hover {
+  background: rgba(244, 67, 54, 0.2);
+  border-color: #F44336;
+  color: #EF9A9A;
+}
+
+.muteBtn.active {
+  background: rgba(244, 67, 54, 0.3);
+  border-color: #F44336;
+  color: #EF5350;
+}
+
+.soloBtn:hover {
+  background: rgba(255, 193, 7, 0.2);
+  border-color: #FFC107;
+  color: #FFD54F;
+}
+
+.soloBtn.active {
+  background: rgba(255, 193, 7, 0.35);
+  border-color: #FFC107;
+  color: #FFD740;
+}
+
 .deleteBtn {
   width: 22px;
   height: 22px;
@@ -46,6 +89,11 @@
 .deleteBtn:hover {
   opacity: 1;
   background: rgba(244, 67, 54, 0.15);
+}
+
+/* Piste muée : opacité réduite sur la lane */
+.muted .lane {
+  opacity: 0.4;
 }
 
 .lane {

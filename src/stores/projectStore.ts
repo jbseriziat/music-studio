@@ -95,11 +95,12 @@ function restoreTracks(project: MspProject): void {
  */
 async function syncRestoredClipsToEngine(project: MspProject): Promise<void> {
   await clearTimeline();
-  for (const track of project.tracks) {
+  for (let trackIdx = 0; trackIdx < project.tracks.length; trackIdx++) {
+    const track = project.tracks[trackIdx];
     for (const clip of track.clips) {
       const numId = extractNumericId(clip.id);
       try {
-        await addClipCmd(numId, clip.sample_id, clip.position, clip.duration);
+        await addClipCmd(numId, clip.sample_id, clip.position, clip.duration, trackIdx);
       } catch (e) {
         console.warn('[ProjectStore] syncClip error', clip.id, e);
       }

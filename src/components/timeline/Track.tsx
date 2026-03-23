@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Clip } from './Clip';
-import { addClipCmd, moveClipCmd } from '../../utils/tauri-commands';
+import { addClipCmd, moveClipCmd, setTrackMuteCmd, setTrackSoloCmd } from '../../utils/tauri-commands';
 import { useTracksStore } from '../../stores/tracksStore';
 import styles from './Track.module.css';
 
@@ -18,8 +18,12 @@ interface TrackClip {
 
 interface Props {
   id: string;
+  /** Index numérique 0-based de la piste — transmis au moteur audio pour mute/solo. */
+  trackIndex: number;
   name: string;
   color: string;
+  muted: boolean;
+  solo: boolean;
   clips: TrackClip[];
   pixelsPerSec: number;
   selectedClipId: string | null;
@@ -33,8 +37,8 @@ function snapToGrid(value: number, grid: number): number {
 
 let clipIdCounter = 100;
 
-export function Track({ id, name, color, clips, pixelsPerSec, selectedClipId, onSelectClip, onDeleteTrack }: Props) {
-  const { addClip, moveClip } = useTracksStore();
+export function Track({ id, trackIndex, name, color, muted, solo, clips, pixelsPerSec, selectedClipId, onSelectClip, onDeleteTrack }: Props) {
+  const { addClip, moveClip, updateTrack } = useTracksStore();
   const draggingRef = useRef<{ clipId: string; startX: number; startPos: number } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   // Compteur de dragEnter/Leave pour gérer les enfants (qui déclenchent aussi ces événements).
@@ -73,11 +77,27 @@ export function Track({ id, name, color, clips, pixelsPerSec, selectedClipId, on
         waveformData: data.waveform ?? [],
       });
 
-      await addClipCmd(clipIdCounter, data.sampleId, position, durationSecs);
+      await addClipCmd(clipIdCounter, data.sampleId, position, durationSecs, trackIndex);
     } catch (err) {
       console.error('[Track] drop error', err);
     }
-  }, [id, pixelsPerSec, color, addClip]);
+  }, [id, trackIndex, pixelsPerSec, color, addClip]);
+
+  const handleMute = useCallback(() => {
+    const newMuted = !muted;
+    updateTrack(id, { muted: newMuted });
+    setTrackMuteCmd(trackIndex, newMuted).catch(
+      (e) => console.error('[Track] setMute error', e),
+    );
+  }, [id, trackIndex, muted, updateTrack]);
+
+  const handleSolo = useCallback(() => {
+    const newSolo = !solo;
+    updateTrack(id, { solo: newSolo });
+    setTrackSoloCmd(trackIndex, newSolo).catch(
+      (e) => console.error('[Track] setSolo error', e),
+    );
+  }, [id, trackIndex, solo, updateTrack]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -127,9 +147,30 @@ export function Track({ id, name, color, clips, pixelsPerSec, selectedClipId, on
   }, [id, pixelsPerSec, moveClip]);
 
   return (
-    <div className={styles.track}>
+    <div className={`${styles.track} ${muted ? styles.muted : ''}`}>
       <div className={styles.header} style={{ borderLeftColor: color }}>
         <span className={styles.name}>{name}</span>
+
+        {/* ─── Boutons Mute / Solo ──────────────────────────────────── */}
+        <button
+          className={`${styles.muteBtn} ${muted ? styles.active : ''}`}
+          onClick={handleMute}
+          title={muted ? 'Activer la piste' : 'Couper la piste'}
+          aria-label="Mute"
+          aria-pressed={muted}
+        >
+          M
+        </button>
+        <button
+          className={`${styles.soloBtn} ${solo ? styles.active : ''}`}
+          onClick={handleSolo}
+          title={solo ? 'Désactiver le solo' : 'Mettre en solo'}
+          aria-label="Solo"
+          aria-pressed={solo}
+        >
+          S
+        </button>
+
         <button
           className={styles.deleteBtn}
           onClick={() => onDeleteTrack(id)}

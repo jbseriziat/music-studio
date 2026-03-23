@@ -5,4 +5,5 @@ export { PauseButton } from './PauseButton';
 export { TimeDisplay } from './TimeDisplay';
 export { BpmControl } from './BpmControl';
 export { MetronomeToggle } from './MetronomeToggle';
+export { LoopButton } from './LoopButton';
 export { RecordButton } from './RecordButton';

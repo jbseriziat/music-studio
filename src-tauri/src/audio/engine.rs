@@ -11,6 +11,12 @@ use std::sync::{
 
 use super::commands::AudioCommand;
 use super::config::AudioConfig;
+use crate::transport::Metronome;
+
+/// ID réservé pour le sample de click métronome accent (premier temps).
+const METRO_ACCENT_ID: u32 = 253;
+/// ID réservé pour le sample de click métronome normal.
+const METRO_CLICK_ID: u32 = 254;
 
 // ─── Wrapper Send pour cpal::Stream (non-Send sur Linux/ALSA) ────────────────
 #[allow(dead_code)]
@@ -118,6 +124,8 @@ struct TimelineClip {
     sample_id: u32,
     position_frames: u64,
     duration_frames: u64,
+    /// Index numérique de la piste (0-based). Utilisé pour le mute/solo.
+    track_id: u32,
 }
 
 // ─── État du callback audio ───────────────────────────────────────────────────
@@ -169,8 +177,22 @@ struct AudioCallbackState {
 
     // ─── Métronome ────────────────────────────────────────────────────────────
     metronome_enabled: bool,
+    /// Volume du métronome (0.0–1.0). Indépendant du volume master.
+    metronome_volume: f32,
     /// Voix du click métronome en cours.
     metronome_voice: Option<Voice>,
+
+    // ─── Boucle ───────────────────────────────────────────────────────────────
+    loop_enabled: bool,
+    loop_start_frames: u64,
+    loop_end_frames: u64,
+
+    // ─── Mute / Solo par piste ────────────────────────────────────────────────
+    /// Tableau fixe [bool; 64], indexé par track_id % 64.
+    track_muted: [bool; 64],
+    track_solo: [bool; 64],
+    /// Cache : vrai si au moins une piste est en solo.
+    any_track_solo: bool,
 
     // ─── Atomics partagés avec le thread principal ────────────────────────────
     position_atomic: Arc<AtomicU64>,
@@ -251,10 +273,10 @@ impl AudioCallbackState {
             AudioCommand::StopPreview => {
                 self.preview_voice = None;
             }
-            AudioCommand::AddClip { id, sample_id, position_frames, duration_frames } => {
+            AudioCommand::AddClip { id, sample_id, position_frames, duration_frames, track_id } => {
                 // Retirer un clip existant avec le même id si présent.
                 self.clips.retain(|c| c.id != id);
-                self.clips.push(TimelineClip { id, sample_id, position_frames, duration_frames });
+                self.clips.push(TimelineClip { id, sample_id, position_frames, duration_frames, track_id });
             }
             AudioCommand::MoveClip { id, new_position_frames } => {
                 if let Some(clip) = self.clips.iter_mut().find(|c| c.id == id) {
@@ -324,6 +346,24 @@ impl AudioCallbackState {
                 if !enabled {
                     self.metronome_voice = None;
                 }
+            }
+            AudioCommand::SetMetronomeVolume { volume } => {
+                self.metronome_volume = volume.clamp(0.0, 1.0);
+            }
+            AudioCommand::SetLoop { enabled, start_frames, end_frames } => {
+                self.loop_enabled = enabled;
+                self.loop_start_frames = start_frames;
+                self.loop_end_frames = end_frames;
+            }
+            AudioCommand::SetTrackMute { track_id, muted } => {
+                let idx = (track_id % 64) as usize;
+                self.track_muted[idx] = muted;
+            }
+            AudioCommand::SetTrackSolo { track_id, solo } => {
+                let idx = (track_id % 64) as usize;
+                self.track_solo[idx] = solo;
+                // Recalculer le cache any_track_solo.
+                self.any_track_solo = self.track_solo.iter().any(|&s| s);
             }
             AudioCommand::SetDrumStepCount { count } => {
                 let c = (count as usize).max(1).min(32);
@@ -436,6 +476,12 @@ impl AudioEngine {
         let mut samples: Vec<Option<SampleData>> = Vec::with_capacity(256);
         samples.resize_with(256, || None);
 
+        // Générer et injecter les sons synthétiques du métronome.
+        let accent_frames = Metronome::generate_accent(sample_rate);
+        let click_frames  = Metronome::generate_normal(sample_rate);
+        samples[METRO_ACCENT_ID as usize] = Some(SampleData { frames: accent_frames, channels: 1, sample_rate });
+        samples[METRO_CLICK_ID  as usize] = Some(SampleData { frames: click_frames,  channels: 1, sample_rate });
+
         // BPM par défaut : 120. samples_per_step = 48000 * 60 / (120 * 4) = 6000
         let default_bpm = 120.0f64;
         let default_sps = (sample_rate as f64 * 60.0) / (default_bpm * 4.0);
@@ -465,7 +511,16 @@ impl AudioEngine {
             drum_pad_pitches: [0.0f32; 8],
             drum_voices: Vec::with_capacity(64),
             metronome_enabled: false,
+            metronome_volume: 0.6,
             metronome_voice: None,
+            // Boucle
+            loop_enabled: false,
+            loop_start_frames: 0,
+            loop_end_frames: 0,
+            // Mute / Solo
+            track_muted: [false; 64],
+            track_solo: [false; 64],
+            any_track_solo: false,
             // Atomics
             position_atomic: position_atomic_cb,
             is_playing_atomic: is_playing_atomic_cb,
@@ -529,10 +584,24 @@ impl AudioEngine {
 
                     // Voix de clips (timeline).
                     if state.is_playing {
-                        for (_, voice) in &mut state.clip_voices {
-                            let (l, r) = voice.next_stereo(&state.samples);
-                            left += l;
-                            right += r;
+                        for (cid, voice) in &mut state.clip_voices {
+                            // Vérifier mute / solo avant de mixer.
+                            let audible = if let Some(clip) = state.clips.iter().find(|c| c.id == *cid) {
+                                let idx = (clip.track_id % 64) as usize;
+                                let muted = state.track_muted[idx];
+                                let solo_ok = !state.any_track_solo || state.track_solo[idx];
+                                !muted && solo_ok
+                            } else {
+                                false
+                            };
+                            if audible {
+                                let (l, r) = voice.next_stereo(&state.samples);
+                                left += l;
+                                right += r;
+                            } else {
+                                // Avancer quand même pour conserver la sync.
+                                voice.position += 1;
+                            }
                         }
                         state.clip_voices.retain(|(cid, v)| {
                             if v.is_done(&state.samples) { return false; }
@@ -573,8 +642,13 @@ impl AudioEngine {
                                 // ── Métronome (click tous les 4 steps = 1 temps) ──
                                 if state.metronome_enabled && state.sequencer_step % 4 == 0 {
                                     // Accent sur le premier temps (step 0), click normal sinon.
-                                    let metro_sid = if state.sequencer_step == 0 { 2u32 } else { 4u32 };
-                                    state.metronome_voice = Some(Voice { sample_id: metro_sid, position: 0, velocity: 0.6 });
+                                    let metro_sid = if state.sequencer_step == 0 {
+                                        METRO_ACCENT_ID
+                                    } else {
+                                        METRO_CLICK_ID
+                                    };
+                                    let vol = state.metronome_volume;
+                                    state.metronome_voice = Some(Voice { sample_id: metro_sid, position: 0, velocity: vol });
                                 }
                             }
                         }
@@ -598,6 +672,23 @@ impl AudioEngine {
                         }
 
                         state.position_frames += 1;
+
+                        // ── Boucle ────────────────────────────────────────────
+                        if state.loop_enabled
+                            && state.loop_end_frames > 0
+                            && state.position_frames >= state.loop_end_frames
+                        {
+                            state.position_frames = state.loop_start_frames;
+                            // Supprimer les voix de clips qui dépasseraient la zone de boucle.
+                            state.clip_voices.retain(|(cid, _)| {
+                                state.clips.iter().any(|c| {
+                                    c.id == *cid
+                                        && c.position_frames >= state.loop_start_frames
+                                        && c.position_frames < state.loop_end_frames
+                                })
+                            });
+                        }
+
                         // Mise à jour atomique périodique (~chaque 512 frames).
                         if state.position_frames % 512 == 0 {
                             state.position_atomic.store(state.position_frames, Ordering::Relaxed);

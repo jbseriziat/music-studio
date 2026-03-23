@@ -92,8 +92,25 @@ export const addClipCmd = (
   sampleId: number,
   positionSecs: number,
   durationSecs: number,
+  trackId: number,
 ): Promise<void> =>
-  invoke<void>('add_clip', { clipId, sampleId, positionSecs, durationSecs });
+  invoke<void>('add_clip', { clipId, sampleId, positionSecs, durationSecs, trackId });
+
+/** Configure la zone de boucle (en secondes). */
+export const setLoopCmd = (enabled: boolean, startSecs: number, endSecs: number): Promise<void> =>
+  invoke<void>('set_loop', { enabled, startSecs, endSecs });
+
+/** Active/désactive le mute d'une piste (trackId = index 0-based). */
+export const setTrackMuteCmd = (trackId: number, muted: boolean): Promise<void> =>
+  invoke<void>('set_track_mute', { trackId, muted });
+
+/** Active/désactive le solo d'une piste. */
+export const setTrackSoloCmd = (trackId: number, solo: boolean): Promise<void> =>
+  invoke<void>('set_track_solo', { trackId, solo });
+
+/** Ajuste le volume du métronome (0.0–1.0). */
+export const setMetronomeVolumeCmd = (volume: number): Promise<void> =>
+  invoke<void>('set_metronome_volume', { volume });
 
 export const moveClipCmd = (clipId: number, newPositionSecs: number): Promise<void> =>
   invoke<void>('move_clip', { clipId, newPositionSecs });
