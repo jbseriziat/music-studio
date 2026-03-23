@@ -72,6 +72,7 @@ struct AudioCallbackState {
     master_volume: f32,
     is_playing: bool,
     position_frames: u64,
+    #[allow(dead_code)]
     sample_rate: u32,
 
     /// Banque de samples : indexé par sample_id. Pré-alloué à 256.
@@ -174,6 +175,14 @@ impl AudioCallbackState {
             AudioCommand::DeleteClip { id } => {
                 self.clips.retain(|c| c.id != id);
                 self.clip_voices.retain(|(cid, _)| *cid != id);
+            }
+            AudioCommand::ClearTimeline => {
+                self.clips.clear();
+                self.clip_voices.clear();
+                self.position_frames = 0;
+                self.is_playing = false;
+                self.is_playing_atomic.store(false, Ordering::Relaxed);
+                self.position_atomic.store(0, Ordering::Relaxed);
             }
         }
     }
@@ -317,7 +326,15 @@ impl AudioEngine {
                             left += l;
                             right += r;
                         }
-                        state.clip_voices.retain(|(_, v)| !v.is_done(&state.samples));
+                        state.clip_voices.retain(|(cid, v)| {
+                            if v.is_done(&state.samples) { return false; }
+                            // Respecter la durée du clip.
+                            if let Some(clip) = state.clips.iter().find(|c| c.id == *cid) {
+                                (v.position as u64) < clip.duration_frames
+                            } else {
+                                false
+                            }
+                        });
 
                         state.position_frames += 1;
                         // Mise à jour atomique périodique (~chaque 512 frames).

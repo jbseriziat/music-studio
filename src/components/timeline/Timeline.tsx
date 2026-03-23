@@ -5,6 +5,7 @@ import { Playhead } from './Playhead';
 import { AddTrackButton } from './AddTrackButton';
 import { useTracksStore } from '../../stores/tracksStore';
 import { useFeatureLevel } from '../../hooks/useFeatureLevel';
+import { deleteClipCmd } from '../../utils/tauri-commands';
 import styles from './Timeline.module.css';
 
 const PIXELS_PER_SEC = 100;
@@ -45,10 +46,20 @@ export function Timeline({ positionSecs }: Props) {
     }
   }, [positionSecs]);
 
-  // Touche Suppr pour effacer le clip sélectionné.
+  // Touche Suppr pour effacer le clip sélectionné (frontend + moteur audio).
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const handler = async (e: KeyboardEvent) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipId) {
+        // Synchroniser la suppression avec le moteur audio.
+        // Le clip ID frontend est "clip-<number>" → extraire la partie numérique.
+        const match = selectedClipId.match(/\d+/);
+        if (match) {
+          try {
+            await deleteClipCmd(Number(match[0]));
+          } catch {
+            // Le clip peut ne pas être dans le moteur (pas encore joué), ignorer.
+          }
+        }
         useTracksStore.getState().removeClip(selectedClipId);
         selectClip(null);
       }

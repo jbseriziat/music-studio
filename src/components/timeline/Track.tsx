@@ -1,6 +1,6 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Clip } from './Clip';
-import { addClipCmd } from '../../utils/tauri-commands';
+import { addClipCmd, moveClipCmd } from '../../utils/tauri-commands';
 import { useTracksStore } from '../../stores/tracksStore';
 import styles from './Track.module.css';
 
@@ -36,9 +36,14 @@ let clipIdCounter = 100;
 export function Track({ id, name, color, clips, pixelsPerSec, selectedClipId, onSelectClip, onDeleteTrack }: Props) {
   const { addClip, moveClip } = useTracksStore();
   const draggingRef = useRef<{ clipId: string; startX: number; startPos: number } | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  // Compteur de dragEnter/Leave pour gérer les enfants (qui déclenchent aussi ces événements).
+  const dragCountRef = useRef(0);
 
   const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    dragCountRef.current = 0;
+    setIsDragOver(false);
     const rect = e.currentTarget.getBoundingClientRect();
     const rawPos = (e.clientX - rect.left) / pixelsPerSec;
     const position = Math.max(0, snapToGrid(rawPos, SNAP_GRID));
@@ -79,6 +84,20 @@ export function Track({ id, name, color, clips, pixelsPerSec, selectedClipId, on
     e.dataTransfer.dropEffect = 'copy';
   }, []);
 
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCountRef.current += 1;
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    dragCountRef.current -= 1;
+    if (dragCountRef.current <= 0) {
+      dragCountRef.current = 0;
+      setIsDragOver(false);
+    }
+  }, []);
+
   const handleClipMoveStart = useCallback((clipId: string, startX: number, startPos: number) => {
     draggingRef.current = { clipId, startX, startPos };
 
@@ -86,10 +105,22 @@ export function Track({ id, name, color, clips, pixelsPerSec, selectedClipId, on
       if (!draggingRef.current) return;
       const delta = (e.clientX - draggingRef.current.startX) / pixelsPerSec;
       const newPos = Math.max(0, snapToGrid(draggingRef.current.startPos + delta, SNAP_GRID));
-      const { clipId } = draggingRef.current;
+      const { clipId: cId } = draggingRef.current;
       draggingRef.current = null;
       document.removeEventListener('mouseup', onMouseUp);
-      moveClip(clipId, id, newPos);
+
+      // Mettre à jour le store frontend.
+      moveClip(cId, id, newPos);
+
+      // Synchroniser le déplacement avec le moteur audio.
+      const match = cId.match(/\d+/);
+      if (match) {
+        try {
+          await moveClipCmd(Number(match[0]), newPos);
+        } catch {
+          // Le clip peut ne pas exister dans le moteur audio, ignorer.
+        }
+      }
     };
 
     document.addEventListener('mouseup', onMouseUp);
@@ -109,9 +140,11 @@ export function Track({ id, name, color, clips, pixelsPerSec, selectedClipId, on
         </button>
       </div>
       <div
-        className={styles.lane}
+        className={`${styles.lane} ${isDragOver ? styles.dragOver : ''}`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
       >
         {clips.map(clip => (
           <Clip

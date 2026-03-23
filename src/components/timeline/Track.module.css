@@ -59,4 +59,12 @@
     var(--color-border) 50px
   );
   overflow: hidden;
+  transition: background-color 0.1s;
+}
+
+/* Surbrillance de la zone de dépôt pendant le drag */
+.dragOver {
+  background-color: var(--color-accent-glow);
+  outline: 2px dashed var(--color-accent);
+  outline-offset: -2px;
 }

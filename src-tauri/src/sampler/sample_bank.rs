@@ -404,6 +404,7 @@ pub fn ensure_samples_exist(app_data_dir: &Path) -> PathBuf {
     add_sample!("fun/effects", "woosh.wav", "Swoosh 💨", "fun", &["effect","swoosh"], gen_effect_woosh(sr));
     add_sample!("fun/effects", "boing.wav", "Boing 🎈",  "fun", &["effect","boing"],  gen_effect_boing(sr));
     add_sample!("fun/effects", "pop.wav",   "Pop 🫧",    "fun", &["effect","pop"],    gen_effect_boing(sr));
+    let _ = id; // silence unused_assignments: id is incremented after the last sample
 
     // Sauvegarder metadata.json
     let json = serde_json::to_string_pretty(&entries)

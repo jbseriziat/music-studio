@@ -40,4 +40,7 @@ pub enum AudioCommand {
         new_position_frames: u64,
     },
     DeleteClip { id: u32 },
+
+    /// Supprime tous les clips de la timeline (nouveau projet / chargement).
+    ClearTimeline,
 }
