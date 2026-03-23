@@ -81,7 +81,27 @@ Les specs complètes de chaque phase sont dans le dossier `docs/` :
 IMPORTANT : avant d'implémenter une tâche, lis toujours la spec de la phase correspondante ET la spec d'architecture (Phase 0).
 
 ## Phase en cours
-Phase 1 — Découverte : La Boîte à Sons (voir @docs/SPEC_PHASE_1_DECOUVERTE.md)
+Phase 2 — Petit Producteur : Drum Rack + Step Sequencer + BPM (voir @docs/SPEC_PHASE_2_PETIT_PRODUCTEUR.md)
+
+## Phase 1 — ✅ TERMINÉE
+
+Étapes réalisées :
+1. ✅ Sound Pads 4×4 avec couleurs, icônes, animation pulse, drag & drop
+2. ✅ Sample Browser (panneau latéral, catégories, prévisualisation, drag)
+3. ✅ Timeline (pistes, clips avec waveform, playhead, snap-to-grid 0.5s)
+4. ✅ Transport Play/Stop avec polling position 50ms
+5. ✅ Moteur audio Rust complet : pads polyphoniques, clips timeline, preview
+6. ✅ Génération synthétique de 16 samples WAV au premier lancement
+7. ✅ Sauvegarde/chargement projet (.msp JSON)
+8. ✅ Raccourcis clavier (Space, Delete, Ctrl+Z, Ctrl+S)
+9. ✅ Thème colorful enfant, Radix DropdownMenu sur pads, SamplePickerDialog
+10. ✅ Undo history (30 snapshots) dans tracksStore
+
+Notes d'implémentation Phase 1 :
+- Drag payload : `{ type: 'pad'|'sample', sampleId, sampleName, durationMs?, waveform? }`
+- `dragEnter/Leave counter` pattern dans Track.tsx pour éviter le flickering
+- `transition: left 55ms linear` sur le playhead pour lisser le polling 50ms
+- CSS aliases `--color-*` → `--bg-*/--text-*/--border` dans `:root` de global.css
 
 ## Phase 0 — ✅ TERMINÉE
 
