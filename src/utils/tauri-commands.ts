@@ -176,6 +176,10 @@ export interface DrumPatternDto {
 export const setBpmCmd = (bpm: number): Promise<void> =>
   invoke<void>('set_bpm', { bpm });
 
+/** Retourne le BPM actuel depuis le moteur audio. */
+export const getBpm = (): Promise<number> =>
+  invoke<number>('get_bpm');
+
 /** Active ou désactive un step pour un pad. velocity ∈ [0.0, 1.0]. */
 export const setDrumStep = (pad: number, step: number, active: boolean, velocity = 1.0): Promise<void> =>
   invoke<void>('set_drum_step', { pad, step, active, velocity });

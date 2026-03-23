@@ -123,6 +123,8 @@ struct AudioCallbackState {
     is_playing_atomic: Arc<AtomicBool>,
     /// Step courant du séquenceur (pour l'UI).
     current_step_atomic: Arc<AtomicU8>,
+    /// BPM courant stocké comme bits f64 (pour lecture sans lock depuis le thread principal).
+    bpm_atomic: Arc<AtomicU64>,
 }
 
 impl AudioCallbackState {
@@ -229,6 +231,7 @@ impl AudioCallbackState {
                 self.bpm = bpm.clamp(20.0, 300.0);
                 // samples_per_step = SR * 60 / (bpm * 4) pour du 1/16 à 4/4
                 self.samples_per_step = (self.sample_rate as f64 * 60.0) / (self.bpm * 4.0);
+                self.bpm_atomic.store(self.bpm.to_bits(), Ordering::Relaxed);
             }
             AudioCommand::SetDrumStep { pad, step, active, velocity } => {
                 let p = pad as usize;
@@ -307,6 +310,8 @@ pub struct AudioEngine {
     pub is_playing: Arc<AtomicBool>,
     /// Step courant du séquenceur (partagé avec le callback audio).
     pub current_step: Arc<AtomicU8>,
+    /// BPM courant comme bits f64 (lecture lock-free depuis le thread principal).
+    pub bpm_bits: Arc<AtomicU64>,
 }
 
 impl AudioEngine {
@@ -323,6 +328,7 @@ impl AudioEngine {
                     position_frames: Arc::new(AtomicU64::new(0)),
                     is_playing: Arc::new(AtomicBool::new(false)),
                     current_step: Arc::new(AtomicU8::new(0)),
+                    bpm_bits: Arc::new(AtomicU64::new(120.0f64.to_bits())),
                 }
             }
         }
@@ -354,9 +360,11 @@ impl AudioEngine {
         let position_atomic = Arc::new(AtomicU64::new(0));
         let is_playing_atomic = Arc::new(AtomicBool::new(false));
         let current_step_atomic = Arc::new(AtomicU8::new(0));
+        let bpm_atomic = Arc::new(AtomicU64::new(120.0f64.to_bits()));
         let position_atomic_cb = Arc::clone(&position_atomic);
         let is_playing_atomic_cb = Arc::clone(&is_playing_atomic);
         let current_step_atomic_cb = Arc::clone(&current_step_atomic);
+        let bpm_atomic_cb = Arc::clone(&bpm_atomic);
 
         // Pré-allouer l'état du callback (pas d'allocation dans le callback lui-même).
         let mut samples: Vec<Option<SampleData>> = Vec::with_capacity(256);
@@ -394,6 +402,7 @@ impl AudioEngine {
             position_atomic: position_atomic_cb,
             is_playing_atomic: is_playing_atomic_cb,
             current_step_atomic: current_step_atomic_cb,
+            bpm_atomic: bpm_atomic_cb,
         };
 
         let output_channels = channels as usize;
@@ -558,6 +567,7 @@ impl AudioEngine {
             position_frames: position_atomic,
             is_playing: is_playing_atomic,
             current_step: current_step_atomic,
+            bpm_bits: bpm_atomic,
         })
     }
 

@@ -1,4 +1,7 @@
-use std::sync::{atomic::Ordering, Mutex};
+use std::sync::{
+    atomic::Ordering,
+    Mutex,
+};
 use tauri::State;
 
 use crate::audio::{AudioCommand, AudioEngine};
@@ -77,6 +80,13 @@ pub fn set_metronome(enabled: bool, engine: State<Mutex<AudioEngine>>) -> Result
 pub fn get_current_step(engine: State<Mutex<AudioEngine>>) -> Result<u8, String> {
     let eng = engine.inner().lock().map_err(|e| e.to_string())?;
     Ok(eng.current_step.load(Ordering::Relaxed))
+}
+
+/// Retourne le BPM actuel tel que connu par le moteur audio.
+#[tauri::command]
+pub fn get_bpm(engine: State<Mutex<AudioEngine>>) -> Result<f64, String> {
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    Ok(f64::from_bits(eng.bpm_bits.load(Ordering::Relaxed)))
 }
 
 /// Définit le nombre de steps du pattern (8, 16, ou 32).

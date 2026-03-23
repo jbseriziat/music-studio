@@ -19,7 +19,7 @@ use commands::audio_commands::{
     set_position, stop,
 };
 use commands::drum_commands::{
-    assign_drum_pad, get_current_step, set_bpm, set_drum_pattern, set_drum_step,
+    assign_drum_pad, get_bpm, get_current_step, set_bpm, set_drum_pattern, set_drum_step,
     set_drum_step_count, set_metronome, trigger_drum_pad,
 };
 use commands::project_commands::{
@@ -103,6 +103,7 @@ pub fn run() {
             get_pad_config,
             // Drum rack & séquenceur
             set_bpm,
+            get_bpm,
             set_drum_step,
             assign_drum_pad,
             trigger_drum_pad,
