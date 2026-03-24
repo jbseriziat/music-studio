@@ -86,4 +86,70 @@ pub enum AudioCommand {
 
     /// Transpose un pad du drum rack en demi-tons (−12 à +12).
     SetDrumPadPitch { pad: u8, pitch_semitones: f32 },
+
+    // ── Synthétiseur (pistes Instrument) ─────────────────────────────────────
+
+    /// Initialise un slot de synthé pour cette piste (sans allocation : le slot est pré-alloué).
+    CreateSynthTrack { track_id: u32 },
+
+    /// Déclenche une note sur la piste instrument donnée.
+    NoteOn { track_id: u32, note: u8, velocity: u8 },
+
+    /// Relâche une note sur la piste instrument donnée.
+    NoteOff { track_id: u32, note: u8 },
+
+    /// Met à jour un paramètre du synthé d'une piste (sans String : enum compact).
+    SetSynthParam { track_id: u32, param: SynthParam, value: f32 },
+
+    /// Charge un preset entier sur la piste instrument donnée.
+    LoadSynthPreset { track_id: u32, preset: crate::synth::SynthPreset },
+}
+
+/// Paramètre de synthé encodé comme enum (pas de String → pas d'allocation/déallocation dans le callback).
+/// Conversion depuis les chaînes JS dans les commandes Tauri.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SynthParam {
+    Waveform,
+    Attack,
+    Decay,
+    Sustain,
+    Release,
+    Cutoff,
+    Resonance,
+    Octave,
+    Detune,
+    Volume,
+}
+
+impl SynthParam {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "waveform"  => Some(Self::Waveform),
+            "attack"    => Some(Self::Attack),
+            "decay"     => Some(Self::Decay),
+            "sustain"   => Some(Self::Sustain),
+            "release"   => Some(Self::Release),
+            "cutoff"    => Some(Self::Cutoff),
+            "resonance" => Some(Self::Resonance),
+            "octave"    => Some(Self::Octave),
+            "detune"    => Some(Self::Detune),
+            "volume"    => Some(Self::Volume),
+            _           => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Waveform  => "waveform",
+            Self::Attack    => "attack",
+            Self::Decay     => "decay",
+            Self::Sustain   => "sustain",
+            Self::Release   => "release",
+            Self::Cutoff    => "cutoff",
+            Self::Resonance => "resonance",
+            Self::Octave    => "octave",
+            Self::Detune    => "detune",
+            Self::Volume    => "volume",
+        }
+    }
 }

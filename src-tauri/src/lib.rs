@@ -32,6 +32,9 @@ use commands::sample_commands::{
     stop_preview, trigger_pad,
 };
 use commands::settings_commands::{get_audio_devices, get_profiles, save_profiles};
+use commands::synth_commands::{
+    create_synth_track, list_synth_presets, load_synth_preset, note_off, note_on, set_synth_param,
+};
 
 /// Commande de test IPC (Phase 0)
 #[tauri::command]
@@ -120,6 +123,13 @@ pub fn run() {
             set_drum_pad_pitch,
             load_drum_kit,
             list_drum_kits,
+            // Synthétiseur
+            create_synth_track,
+            note_on,
+            note_off,
+            set_synth_param,
+            load_synth_preset,
+            list_synth_presets,
             // Settings
             get_audio_devices,
             get_profiles,

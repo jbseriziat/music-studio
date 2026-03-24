@@ -11,7 +11,13 @@ use std::sync::{
 
 use super::commands::AudioCommand;
 use super::config::AudioConfig;
+use crate::synth::SynthEngine;
 use crate::transport::Metronome;
+
+/// Nombre maximal de pistes synthétiseur simultanées.
+const MAX_SYNTH_TRACKS: usize = 4;
+/// Valeur sentinelle : aucune piste assignée à ce slot.
+const NO_TRACK: u32 = u32::MAX;
 
 /// ID réservé pour le sample de click métronome accent (premier temps).
 const METRO_ACCENT_ID: u32 = 253;
@@ -193,6 +199,12 @@ struct AudioCallbackState {
     track_solo: [bool; 64],
     /// Cache : vrai si au moins une piste est en solo.
     any_track_solo: bool,
+
+    // ─── Synthétiseur (pistes Instrument) ─────────────────────────────────────
+    /// Pool de MAX_SYNTH_TRACKS moteurs synthé pré-alloués.
+    synth_engines: Vec<SynthEngine>,
+    /// Track ID associé à chaque slot (NO_TRACK = libre).
+    synth_track_ids: Vec<u32>,
 
     // ─── Atomics partagés avec le thread principal ────────────────────────────
     position_atomic: Arc<AtomicU64>,
@@ -400,6 +412,40 @@ impl AudioCallbackState {
                     self.sequencer_counter = 0.0;
                 }
             }
+
+            // ── Synthétiseur ─────────────────────────────────────────────────
+            AudioCommand::CreateSynthTrack { track_id } => {
+                // Si la piste est déjà assignée, on la réinitialise.
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    self.synth_engines[slot].reset();
+                } else if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == NO_TRACK) {
+                    self.synth_track_ids[slot] = track_id;
+                    self.synth_engines[slot].reset();
+                }
+                // Si tous les slots sont occupés, on ignore silencieusement.
+            }
+            AudioCommand::NoteOn { track_id, note, velocity } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    self.synth_engines[slot].note_on(note, velocity);
+                }
+            }
+            AudioCommand::NoteOff { track_id, note } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    self.synth_engines[slot].note_off(note);
+                }
+            }
+            AudioCommand::SetSynthParam { track_id, param, value } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    self.synth_engines[slot].set_param(param.as_str(), value);
+                }
+            }
+            AudioCommand::LoadSynthPreset { track_id, preset } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    self.synth_engines[slot].apply_preset(&preset);
+                }
+                // preset (contenant une String) est dropé ici depuis le callback —
+                // cohérent avec SetDrumPattern qui drope des Vec de la même façon.
+            }
         }
     }
 }
@@ -521,6 +567,9 @@ impl AudioEngine {
             track_muted: [false; 64],
             track_solo: [false; 64],
             any_track_solo: false,
+            // Synthétiseur : pré-allouer MAX_SYNTH_TRACKS moteurs.
+            synth_engines: (0..MAX_SYNTH_TRACKS).map(|_| SynthEngine::new(sample_rate)).collect(),
+            synth_track_ids: vec![NO_TRACK; MAX_SYNTH_TRACKS],
             // Atomics
             position_atomic: position_atomic_cb,
             is_playing_atomic: is_playing_atomic_cb,
@@ -580,6 +629,18 @@ impl AudioEngine {
                         if pv.is_done(&state.samples) {
                             state.preview_voice = None;
                         }
+                    }
+
+                    // ── Synthétiseurs live (toujours actifs, même sans transport) ──
+                    for i in 0..MAX_SYNTH_TRACKS {
+                        let track_id = state.synth_track_ids[i];
+                        if track_id == NO_TRACK { continue; }
+                        let tidx = (track_id % 64) as usize;
+                        if state.track_muted[tidx] { continue; }
+                        if state.any_track_solo && !state.track_solo[tidx] { continue; }
+                        let (sl, sr) = state.synth_engines[i].process_frame(state.sample_rate);
+                        left  += sl;
+                        right += sr;
                     }
 
                     // Voix de clips (timeline).
