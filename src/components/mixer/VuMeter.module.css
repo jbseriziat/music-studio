@@ -1,0 +1,46 @@
+.vuMeter {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  align-items: flex-end;
+}
+
+.channel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.bar {
+  position: relative;
+  width: 8px;
+  background: var(--color-border);
+  border-radius: 2px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+
+.fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 2px;
+  transition: height 30ms linear;
+}
+
+.peak {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.label {
+  font-size: 9px;
+  color: var(--color-text-muted, #888);
+  line-height: 1;
+}

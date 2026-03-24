@@ -1,0 +1,70 @@
+.compRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.graphRow {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.transferSvg {
+  background: var(--color-bg, #111);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  flex-shrink: 0;
+  width: 150px;
+  height: 150px;
+}
+
+/* ── Gain-reduction column ── */
+.grColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  height: 150px;
+}
+
+.grLabel {
+  font-size: 9px;
+  font-weight: 700;
+  color: #f39c12;
+  letter-spacing: 0.5px;
+}
+
+.grTrack {
+  flex: 1;
+  width: 10px;
+  background: var(--color-surface-raised, #2a2a2a);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.grBar {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  background: #f39c12;
+  border-radius: 2px;
+  transition: height 60ms linear, top 60ms linear;
+}
+
+.grValue {
+  font-size: 8px;
+  color: #f39c12;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Knobs row ── */
+.knobs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}

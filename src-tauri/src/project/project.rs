@@ -56,6 +56,22 @@ pub struct ProjectTrack {
     /// Type de piste : "audio", "drum_rack", "instrument". Absent dans les vieux projets → "audio".
     #[serde(default)]
     pub track_type: Option<String>,
+    /// Lanes d'automation de la piste (Phase 4, absent dans les anciens projets).
+    #[serde(default)]
+    pub automations: Vec<ProjectAutomationLane>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectAutomationLane {
+    pub parameter: String,   // "volume" | "pan"
+    pub points: Vec<ProjectAutomationPoint>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectAutomationPoint {
+    pub id: u32,
+    pub time_beats: f64,
+    pub value: f32,
 }
 
 /// Snapshot du pattern du drum rack dans le projet.

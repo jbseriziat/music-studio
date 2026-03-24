@@ -9,6 +9,7 @@ import {
   addMidiClip,
   updateMidiClipNotes,
   assignPadSample,
+  addAutomationPoint as addAutomationPointCmd,
   type MspProject,
   type ProjectTrack,
   type ProjectClip,
@@ -22,6 +23,8 @@ import { useSynthStore } from './synthStore';
 import { usePianoRollStore } from './pianoRollStore';
 import type { PianoRollNote } from './pianoRollStore';
 import { useTransportStore } from './transportStore';
+import { useAutomationStore } from './automationStore';
+import type { AutomationParameter } from './automationStore';
 import type { Track, Clip } from '../types/audio';
 
 // ─── État ────────────────────────────────────────────────────────────────────
@@ -40,6 +43,8 @@ interface ProjectState {
   saveAs: (name: string) => Promise<void>;
   closeProject: () => void;
   markDirty: () => void;
+  /** Construit le MspProject depuis les stores courants (sans sauvegarder). */
+  buildProject: () => MspProject;
   /** Construit le MspProject depuis les stores courants et le sauvegarde. */
   buildAndSave: (path: string) => Promise<void>;
 }
@@ -49,6 +54,8 @@ interface ProjectState {
 /** Convertit les pistes audio/drum du tracksStore en ProjectTrack[] sérialisables. */
 function buildProjectTracks(): ProjectTrack[] {
   const { tracks, clips } = useTracksStore.getState();
+  const { lanes } = useAutomationStore.getState();
+
   return tracks
     .filter((t) => t.type !== 'instrument') // Les pistes instrument sont gérées séparément.
     .map((t) => ({
@@ -72,6 +79,20 @@ function buildProjectTracks(): ProjectTrack[] {
               duration: c.duration,
               color: c.color,
             })),
+      // Lanes d'automation : on sérialise volume et pan si des points existent.
+      automations: (['volume', 'pan'] as AutomationParameter[]).flatMap((param) => {
+        const key = `${t.id}:${param}`;
+        const pts = lanes[key];
+        if (!pts || pts.length === 0) return [];
+        return [{
+          parameter: param,
+          points: pts.map((p) => ({
+            id: p.id,
+            time_beats: p.timeBeats,
+            value: p.value,
+          })),
+        }];
+      }),
     }));
 }
 
@@ -292,6 +313,46 @@ async function restoreInstrumentTracks(project: MspProject): Promise<void> {
   usePianoRollStore.getState().restoreClipNotes(perClipNotes, maxNoteId + 1);
 }
 
+/**
+ * Restaure les lanes d'automation depuis un MspProject.
+ * Pour chaque point, appelle le backend pour obtenir un nouvel ID, puis met à jour
+ * le store frontend avec cet ID (assure la cohérence frontend ↔ backend).
+ */
+async function restoreAutomation(project: MspProject): Promise<void> {
+  const { setPoints, clearAll } = useAutomationStore.getState();
+  const { tracks: frontendTracks } = useTracksStore.getState();
+
+  // Effacer toute automation existante avant de restaurer.
+  clearAll();
+
+  for (let trackIdx = 0; trackIdx < project.tracks.length; trackIdx++) {
+    const projectTrack = project.tracks[trackIdx];
+    if (!projectTrack.automations?.length) continue;
+
+    // Trouver la piste frontend correspondante par son ID.
+    const frontendTrack = frontendTracks.find((t) => t.id === projectTrack.id);
+    if (!frontendTrack) continue;
+
+    for (const lane of projectTrack.automations) {
+      const parameter = lane.parameter as AutomationParameter;
+      const restoredPoints: Array<{ id: number; timeBeats: number; value: number }> = [];
+
+      for (const pt of lane.points) {
+        try {
+          // Appel backend pour enregistrer le point et obtenir un ID valide.
+          const newId = await addAutomationPointCmd(trackIdx, parameter, pt.time_beats, pt.value);
+          restoredPoints.push({ id: newId, timeBeats: pt.time_beats, value: pt.value });
+        } catch (e) {
+          console.warn('[ProjectStore] restoreAutomation point error:', e);
+        }
+      }
+
+      // Mettre à jour le store frontend avec les points restaurés (déjà triés).
+      setPoints(frontendTrack.id, parameter, restoredPoints);
+    }
+  }
+}
+
 /** Extrait la partie numérique d'un ID de clip frontend (ex: "clip-42" → 42). */
 function extractNumericId(clipId: string): number {
   const m = clipId.match(/\d+/);
@@ -317,6 +378,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 
     // Réinitialise les stores
     useTracksStore.getState().restoreState([], []);
+    useAutomationStore.getState().clearAll();
     await clearTimeline();
 
     // Sauvegarde immédiate (fichier vide)
@@ -358,6 +420,9 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     // Restaure les pistes instrument (synthé + MIDI clips).
     await restoreInstrumentTracks(project);
 
+    // Restaure les lanes d'automation.
+    await restoreAutomation(project);
+
     set({
       projectName: project.name,
       projectPath: path,
@@ -382,13 +447,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     set({ projectName: name, projectPath: path });
   },
 
-  buildAndSave: async (path: string) => {
+  buildProject: () => {
     const { projectName } = get();
     const { pads } = usePadsStore.getState();
     const { steps, velocities, stepCount } = useDrumStore.getState();
     const bpm = useTransportStore.getState().bpm;
-
-    const project: MspProject = {
+    return {
       version: '1.0',
       name: projectName ?? 'Sans titre',
       profile_id: 'default',
@@ -403,7 +467,11 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       },
       instrument_tracks: buildInstrumentTracks(),
     };
+  },
 
+  buildAndSave: async (path: string) => {
+    const { buildProject } = get();
+    const project = buildProject();
     await saveProjectCmd(path, project);
     set({ isDirty: false, lastSavedAt: new Date().toISOString() });
   },
@@ -413,6 +481,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       clearInterval(autoSaveTimer);
       autoSaveTimer = null;
     }
+    useAutomationStore.getState().clearAll();
     set({
       projectName: null,
       projectPath: null,

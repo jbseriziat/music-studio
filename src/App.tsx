@@ -13,9 +13,11 @@ import { DrumRack } from './components/drum-rack/DrumRack';
 import { SynthPanel } from './components/synth/SynthPanel';
 import { PianoRoll } from './components/piano-roll/PianoRoll';
 import { Timeline } from './components/timeline/Timeline';
+import { Mixer } from './components/mixer/Mixer';
 import styles from './App.module.css';
 
 type InstrumentTab = 'pads' | 'drums' | 'synth';
+type MainView = 'timeline' | 'mixer';
 
 function App() {
   const activeProfileId = useSettingsStore((s) => s.activeProfileId);
@@ -24,6 +26,7 @@ function App() {
   const { isVisible } = useFeatureLevel();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<InstrumentTab>('pads');
+  const [mainView, setMainView] = useState<MainView>('timeline');
 
   // Raccourcis clavier globaux (Espace, Suppr, Ctrl+Z, Ctrl+S)
   useKeyboardShortcuts();
@@ -82,11 +85,35 @@ function App() {
             {activeTab === 'drums' && isVisible(2) && <DrumRack />}
             {activeTab === 'synth' && isVisible(3) && <SynthPanel />}
           </section>
+
           <section className={styles.timelineSection}>
-            <Timeline
-              positionSecs={position}
-              onDrumTrackDoubleClick={() => setActiveTab('drums')}
-            />
+            {/* Toggle Timeline / Mixer (niveau 4+) */}
+            {isVisible(4) && (
+              <div className={styles.viewToggle}>
+                <button
+                  className={`${styles.viewBtn} ${mainView === 'timeline' ? styles.viewBtnActive : ''}`}
+                  onClick={() => setMainView('timeline')}
+                  title="Timeline"
+                >
+                  📋 Timeline
+                </button>
+                <button
+                  className={`${styles.viewBtn} ${mainView === 'mixer' ? styles.viewBtnActive : ''}`}
+                  onClick={() => setMainView('mixer')}
+                  title="Mixer"
+                >
+                  🎚️ Mixer
+                </button>
+              </div>
+            )}
+
+            {mainView === 'timeline' && (
+              <Timeline
+                positionSecs={position}
+                onDrumTrackDoubleClick={() => setActiveTab('drums')}
+              />
+            )}
+            {mainView === 'mixer' && isVisible(4) && <Mixer />}
           </section>
         </div>
       </AppShell>

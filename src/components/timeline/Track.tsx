@@ -2,9 +2,13 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Clip } from './Clip';
 import { DrumClip } from './DrumClip';
 import { MidiClip } from './MidiClip';
+import { AutomationLane } from './AutomationLane';
+import { AutomationSelector } from './AutomationSelector';
 import { addClipCmd, moveClipCmd, setTrackMuteCmd, setTrackSoloCmd } from '../../utils/tauri-commands';
 import { useTracksStore } from '../../stores/tracksStore';
+import type { AutomationParameter } from '../../stores/automationStore';
 import styles from './Track.module.css';
+
 
 const SNAP_GRID = 0.5; // secondes
 
@@ -28,6 +32,8 @@ interface Props {
   color: string;
   muted: boolean;
   solo: boolean;
+  /** Piste armée pour l'enregistrement (visible niveau 4+). */
+  armed?: boolean;
   /** Type de la piste : "audio" | "drum_rack" | "instrument". */
   trackType?: string;
   clips: TrackClip[];
@@ -41,6 +47,16 @@ interface Props {
   onAddMidiClip?: () => void;
   /** Callback quand l'utilisateur double-clique sur un clip MIDI (pour ouvrir le piano roll). */
   onMidiClipDoubleClick?: (midiClipId: number) => void;
+  /** Callback pour armer/désarmer la piste (niveau 4+, uniquement pistes audio). */
+  onArmToggle?: () => void;
+  /** Paramètre d'automation affiché (null = lane cachée). Niveau 4+. */
+  automationParameter?: AutomationParameter | null;
+  /** Callback pour afficher/masquer la lane d'automation. */
+  onToggleAutomation?: () => void;
+  /** Callback pour changer le paramètre d'automation. */
+  onChangeAutomationParam?: (param: AutomationParameter) => void;
+  /** Nombre de secondes total de la timeline (pour le SVG d'automation). */
+  totalSecs?: number;
 }
 
 function snapToGrid(value: number, grid: number): number {
@@ -50,9 +66,10 @@ function snapToGrid(value: number, grid: number): number {
 let clipIdCounter = 100;
 
 export function Track({
-  id, trackIndex, name, color, muted, solo, trackType, clips,
+  id, trackIndex, name, color, muted, solo, armed, trackType, clips,
   pixelsPerSec, selectedClipId, onSelectClip, onDeleteTrack,
-  onDoubleClickHeader, onAddMidiClip, onMidiClipDoubleClick,
+  onDoubleClickHeader, onAddMidiClip, onMidiClipDoubleClick, onArmToggle,
+  automationParameter, onToggleAutomation, onChangeAutomationParam, totalSecs,
 }: Props) {
   const { addClip, moveClip, updateTrack } = useTracksStore();
   const draggingRef = useRef<{ clipId: string; startX: number; startPos: number } | null>(null);
@@ -222,67 +239,118 @@ export function Track({
 
   return (
     <div className={`${styles.track} ${muted ? styles.muted : ''}`}>
-      <div
-        className={styles.header}
-        style={{ borderLeftColor: color }}
-        onDoubleClick={onDoubleClickHeader}
-        title={onDoubleClickHeader ? 'Double-clic pour éditer' : undefined}
-      >
-        <span className={styles.name}>{name}</span>
 
-        {/* Bouton "+" pour ajouter un clip MIDI (piste instrument uniquement) */}
-        {trackType === 'instrument' && onAddMidiClip && (
+      {/* ── Ligne principale : header + lane clips ── */}
+      <div className={styles.trackMain}>
+        <div
+          className={styles.header}
+          style={{ borderLeftColor: color }}
+          onDoubleClick={onDoubleClickHeader}
+          title={onDoubleClickHeader ? 'Double-clic pour éditer' : undefined}
+        >
+          <span className={styles.name}>{name}</span>
+
+          {/* Bouton "+" pour ajouter un clip MIDI (piste instrument uniquement) */}
+          {trackType === 'instrument' && onAddMidiClip && (
+            <button
+              className={styles.addMidiBtn}
+              onClick={(e) => { e.stopPropagation(); onAddMidiClip(); }}
+              title="Ajouter un clip MIDI"
+              aria-label="Ajouter un clip MIDI"
+            >
+              +
+            </button>
+          )}
+
+          {/* ─── Bouton Automation (niveau 4+) ─────────────────────── */}
+          {onToggleAutomation && (
+            <button
+              className={`${styles.autoBtn} ${automationParameter != null ? styles.active : ''}`}
+              onClick={(e) => { e.stopPropagation(); onToggleAutomation(); }}
+              title={automationParameter != null ? 'Masquer l\'automation' : 'Afficher l\'automation'}
+              aria-label="Automation"
+              aria-pressed={automationParameter != null}
+            >
+              A
+            </button>
+          )}
+
+          {/* ─── Bouton Arm (enregistrement) — niveau 4+, pistes audio ─── */}
+          {onArmToggle && trackType !== 'drum_rack' && trackType !== 'instrument' && (
+            <button
+              className={`${styles.armBtn} ${armed ? styles.active : ''}`}
+              onClick={(e) => { e.stopPropagation(); onArmToggle(); }}
+              title={armed ? 'Désarmer la piste' : 'Armer pour l\'enregistrement'}
+              aria-label="Arm"
+              aria-pressed={armed}
+            >
+              ●
+            </button>
+          )}
+
+          {/* ─── Boutons Mute / Solo ──────────────────────────────────── */}
           <button
-            className={styles.addMidiBtn}
-            onClick={(e) => { e.stopPropagation(); onAddMidiClip(); }}
-            title="Ajouter un clip MIDI"
-            aria-label="Ajouter un clip MIDI"
+            className={`${styles.muteBtn} ${muted ? styles.active : ''}`}
+            onClick={handleMute}
+            title={muted ? 'Activer la piste' : 'Couper la piste'}
+            aria-label="Mute"
+            aria-pressed={muted}
           >
-            +
+            M
           </button>
-        )}
+          <button
+            className={`${styles.soloBtn} ${solo ? styles.active : ''}`}
+            onClick={handleSolo}
+            title={solo ? 'Désactiver le solo' : 'Mettre en solo'}
+            aria-label="Solo"
+            aria-pressed={solo}
+          >
+            S
+          </button>
 
-        {/* ─── Boutons Mute / Solo ──────────────────────────────────── */}
-        <button
-          className={`${styles.muteBtn} ${muted ? styles.active : ''}`}
-          onClick={handleMute}
-          title={muted ? 'Activer la piste' : 'Couper la piste'}
-          aria-label="Mute"
-          aria-pressed={muted}
-        >
-          M
-        </button>
-        <button
-          className={`${styles.soloBtn} ${solo ? styles.active : ''}`}
-          onClick={handleSolo}
-          title={solo ? 'Désactiver le solo' : 'Mettre en solo'}
-          aria-label="Solo"
-          aria-pressed={solo}
-        >
-          S
-        </button>
+          <button
+            className={styles.deleteBtn}
+            onClick={() => onDeleteTrack(id)}
+            title="Supprimer la piste"
+            aria-label="Supprimer"
+          >
+            🗑️
+          </button>
+        </div>
 
-        <button
-          className={styles.deleteBtn}
-          onClick={() => onDeleteTrack(id)}
-          title="Supprimer la piste"
-          aria-label="Supprimer"
+        <div
+          className={`${styles.lane} ${
+            isDragOver && trackType !== 'drum_rack' && trackType !== 'instrument'
+              ? styles.dragOver : ''
+          }`}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
         >
-          🗑️
-        </button>
+          {renderLaneContent()}
+        </div>
       </div>
-      <div
-        className={`${styles.lane} ${
-          isDragOver && trackType !== 'drum_rack' && trackType !== 'instrument'
-            ? styles.dragOver : ''
-        }`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-      >
-        {renderLaneContent()}
-      </div>
+
+      {/* ── Lane d'automation (niveau 4+, affichée si automationParameter != null) ── */}
+      {automationParameter != null && totalSecs != null && (
+        <div className={styles.automationRow}>
+          <div className={styles.automationSideHeader}>
+            <AutomationSelector
+              parameter={automationParameter}
+              onChange={onChangeAutomationParam}
+            />
+          </div>
+          <div className={styles.automationContent}>
+            <AutomationLane
+              trackId={id}
+              parameter={automationParameter}
+              pixelsPerSec={pixelsPerSec}
+              totalSecs={totalSecs}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,15 +9,23 @@ pub mod sampler;
 pub mod synth;
 pub mod transport;
 
+use audio::recorder::Recorder;
 use audio::AudioEngine;
 use midi::MidiEngine;
 use sampler::sample_bank::{ensure_samples_exist, load_sample_bank};
-use std::sync::Mutex;
-use tauri::Manager;
+use std::sync::{Arc, Mutex};
+use tauri::{Emitter, Manager};
 
 use commands::audio_commands::{
-    add_clip, clear_timeline, delete_clip, move_clip, pause, ping_audio, play, set_loop,
-    set_master_volume, set_metronome_volume, set_position, set_track_mute, set_track_solo, stop,
+    add_clip, add_effect, clear_timeline, delete_clip, get_compressor_gain_reduction,
+    get_effect_params, move_clip, pause, ping_audio, play, remove_effect,
+    set_drum_rack_track_id, set_effect_bypass, set_effect_param, set_loop, set_master_volume,
+    set_metronome_volume, set_position, set_track_mute, set_track_pan_cmd, set_track_solo,
+    set_track_volume_db, stop,
+};
+use commands::automation_commands::{
+    add_automation_point, clear_track_automation, delete_automation_point,
+    get_automation_lane, update_automation_point,
 };
 use commands::drum_commands::{
     assign_drum_pad, get_bpm, get_current_step, list_drum_kits, load_drum_kit, set_bpm,
@@ -40,6 +48,11 @@ use commands::synth_commands::{
 use commands::midi_commands::{
     connect_midi_device, disconnect_midi_device, list_midi_devices, set_midi_active_track,
 };
+use commands::recorder_commands::{
+    arm_track, get_armed_track, is_recording_active, list_input_devices, set_input_device,
+    set_monitoring, start_recording, stop_recording,
+};
+use commands::export_commands::{export_project, get_export_path, import_audio_file};
 
 /// Commande de test IPC (Phase 0)
 #[tauri::command]
@@ -82,12 +95,27 @@ pub fn run() {
                 }
             }
 
+            // ── Thread de métrologie VU-mètres (~30 fps) ──────────────────────
+            {
+                let meter_report = Arc::clone(&engine.meter_report);
+                let handle = app.handle().clone();
+                std::thread::spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_millis(33));
+                    if let Ok(report) = meter_report.lock() {
+                        let _ = handle.emit("audio://meters", report.clone());
+                    }
+                });
+            }
+
             app.manage(Mutex::new(engine));
             app.manage(Mutex::new(bank));
-            // Initialiser le moteur MIDI (connexion faite explicitement via `connect_midi_device`).
+            // Initialiser le moteur MIDI.
             app.manage(Mutex::new(MidiEngine::new()));
+            // Initialiser le recorder (enregistrement micro).
+            app.manage(Mutex::new(Recorder::new()));
             Ok(())
         })
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             // IPC de test
             ping,
@@ -107,6 +135,16 @@ pub fn run() {
             set_track_mute,
             set_track_solo,
             set_metronome_volume,
+            set_track_volume_db,
+            set_track_pan_cmd,
+            set_drum_rack_track_id,
+            // Effets
+            add_effect,
+            remove_effect,
+            set_effect_param,
+            set_effect_bypass,
+            get_effect_params,
+            get_compressor_gain_reduction,
             // Samples & pads
             trigger_pad,
             assign_pad_sample,
@@ -158,6 +196,25 @@ pub fn run() {
             get_projects_dir,
             get_project_path,
             delete_project,
+            // Enregistrement
+            list_input_devices,
+            set_input_device,
+            arm_track,
+            set_monitoring,
+            start_recording,
+            stop_recording,
+            get_armed_track,
+            is_recording_active,
+            // Export & Import
+            export_project,
+            import_audio_file,
+            get_export_path,
+            // Automation
+            add_automation_point,
+            update_automation_point,
+            delete_automation_point,
+            get_automation_lane,
+            clear_track_automation,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

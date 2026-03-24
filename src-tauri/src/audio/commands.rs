@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use crate::effects::BoxedEffect;
+
 /// Commandes envoyées depuis le thread principal vers le thread audio (canal lock-free).
 /// Les variants Arc<Vec<f32>> transfèrent la propriété via ringbuf — pas d'allocation dans le callback.
 #[derive(Debug)]
@@ -117,6 +119,42 @@ pub enum AudioCommand {
 
     /// Efface tous les clips MIDI d'une piste (nouveau projet, chargement).
     ClearMidiClips { track_id: u32 },
+
+    // ── Mixer : volume, panoramique ───────────────────────────────────────────
+
+    /// Règle le volume linéaire d'une piste (0.0 = silence, 1.0 = nominal, > 1.0 = gain).
+    SetTrackVolume { track_id: u32, volume: f32 },
+
+    /// Règle le panoramique d'une piste (-1.0 = gauche, 0.0 = centre, +1.0 = droite).
+    SetTrackPan { track_id: u32, pan: f32 },
+
+    /// Enregistre l'identifiant numérique de la piste Drum Rack (pour le metering).
+    SetDrumRackTrackId { track_id: u32 },
+
+    // ── Effets (insert chain par piste) ──────────────────────────────────────
+
+    /// Ajoute un effet à la chaîne d'une piste (ID généré côté thread principal).
+    AddEffect { track_id: u32, effect_id: u32, effect: BoxedEffect },
+
+    /// Supprime un effet de la chaîne d'une piste.
+    RemoveEffect { track_id: u32, effect_id: u32 },
+
+    /// Définit un paramètre d'un effet.
+    SetEffectParam { track_id: u32, effect_id: u32, param: String, value: f32 },
+
+    /// Active/désactive le bypass d'un effet.
+    SetEffectBypass { track_id: u32, effect_id: u32, bypass: bool },
+
+    // ── Automation ────────────────────────────────────────────────────────────
+
+    /// Remplace la lane d'automation d'un paramètre pour une piste.
+    /// `points` est trié par beats croissant ; l'allocation vient du thread principal.
+    SetAutomationPoints {
+        track_id: u32,
+        param: crate::audio::automation::AutomationParam,
+        /// Paires (beats, valeur_normalisée 0.0–1.0) triées par beats.
+        points: Vec<(f64, f32)>,
+    },
 }
 
 /// Paramètre de synthé encodé comme enum (pas de String → pas d'allocation/déallocation dans le callback).

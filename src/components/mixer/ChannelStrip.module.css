@@ -1,0 +1,94 @@
+.strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--color-accent);
+  border-radius: 6px;
+  min-width: 72px;
+  max-width: 80px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.typeIcon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.name {
+  font-size: 10px;
+  color: var(--color-text);
+  font-weight: 600;
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.effectsArea {
+  width: 100%;
+  min-height: 24px;
+}
+
+.panRow {
+  display: flex;
+  justify-content: center;
+}
+
+.mutesoloRow {
+  display: flex;
+  gap: 4px;
+}
+
+.msBtn {
+  width: 24px;
+  height: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-surface-raised, #2a2a2a);
+  color: var(--color-text-muted, #888);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.msBtn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.muted {
+  background: #c0392b;
+  color: #fff;
+  border-color: #c0392b;
+}
+
+.soloed {
+  background: #f39c12;
+  color: #fff;
+  border-color: #f39c12;
+}
+
+.faderRow {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  align-items: flex-start;
+}
