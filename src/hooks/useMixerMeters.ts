@@ -25,7 +25,9 @@ export function useMixerMeters() {
   const updateMasterMeter = useMixerStore((s) => s.updateMasterMeter);
 
   useEffect(() => {
-    const unlisten = listen<MeterReportPayload>('audio://meters', (event) => {
+    let cancelled = false;
+    const unlistenPromise = listen<MeterReportPayload>('audio://meters', (event) => {
+      if (cancelled) return;
       const { tracks, master } = event.payload;
 
       for (const t of tracks) {
@@ -46,10 +48,14 @@ export function useMixerMeters() {
           rmsR: master.rms_r,
         });
       }
+    }).catch((err) => {
+      console.warn('[useMixerMeters] listen() error:', err);
+      return () => {};
     });
 
     return () => {
-      unlisten.then((fn) => fn());
+      cancelled = true;
+      unlistenPromise.then((fn) => fn());
     };
   }, [updateMeter, updateMasterMeter]);
 }
