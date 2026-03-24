@@ -322,3 +322,26 @@ export const updateMidiClipNotes = (trackId: number, clipId: number, notes: Midi
 /** Supprime un clip MIDI. */
 export const deleteMidiClip = (trackId: number, clipId: number): Promise<void> =>
   invoke<void>('delete_midi_clip', { trackId, clipId });
+
+// ─── MIDI externe ─────────────────────────────────────────────────────────────
+
+export interface MidiDeviceDto {
+  name: string;
+  is_connected: boolean;
+}
+
+/** Liste les périphériques MIDI d'entrée disponibles. */
+export const listMidiDevices = (): Promise<MidiDeviceDto[]> =>
+  invoke<MidiDeviceDto[]>('list_midi_devices');
+
+/** Connecte un périphérique MIDI d'entrée par son nom. */
+export const connectMidiDevice = (deviceName: string): Promise<void> =>
+  invoke<void>('connect_midi_device', { deviceName });
+
+/** Déconnecte le périphérique MIDI actif. */
+export const disconnectMidiDevice = (): Promise<void> =>
+  invoke<void>('disconnect_midi_device');
+
+/** Définit la piste synthé active pour le routage MIDI. */
+export const setMidiActiveTrack = (trackId: number): Promise<void> =>
+  invoke<void>('set_midi_active_track', { trackId });

@@ -1,0 +1,69 @@
+/* ── Conteneur ────────────────────────────────────────────────────────────────── */
+.keyboard {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+  height: 80px;
+  background: var(--color-surface-deep, #0a0a0a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 4px;
+  gap: 1px;
+}
+
+/* ── Touche commune ────────────────────────────────────────────────────────────── */
+.key {
+  border: 1px solid var(--color-border, #444);
+  border-radius: 0 0 4px 4px;
+  cursor: pointer;
+  transition: background 0.06s;
+  flex-shrink: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Touche blanche ────────────────────────────────────────────────────────────── */
+.whiteKey {
+  background: #e8e8e8;
+  height: 72px;
+  width: calc(100% / 17); /* 17 touches blanches sur 2 octaves */
+  min-width: 22px;
+}
+
+.whiteKey:hover {
+  background: #d0d0ef;
+}
+
+.whiteKey.active {
+  background: #b0b0ff;
+}
+
+/* ── Touche noire ──────────────────────────────────────────────────────────────── */
+.blackKey {
+  background: #1a1a2e;
+  height: 46px;
+  width: calc(100% / 28); /* plus étroite que les touches blanches */
+  min-width: 16px;
+  margin: 0 -8px;
+  z-index: 1;
+  position: relative;
+  border-color: #111;
+}
+
+.blackKey:hover {
+  background: #4a2d7c;
+}
+
+.blackKey.active {
+  background: #7b4dcc;
+}
+
+/* ── Indication du raccourci clavier ──────────────────────────────────────────── */
+.hint {
+  margin: 0;
+  font-size: 10px;
+  color: var(--color-text-muted, #666);
+  text-align: center;
+}

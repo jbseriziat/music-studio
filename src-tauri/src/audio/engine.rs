@@ -892,6 +892,14 @@ impl AudioEngine {
         self.command_sender.is_some()
     }
 
+    /// Retourne un clone du canal de commandes audio (pour le MidiEngine).
+    /// None si le moteur audio n'a pas pu être initialisé.
+    pub fn get_command_sender(
+        &self,
+    ) -> Option<Arc<Mutex<ringbuf::HeapProd<AudioCommand>>>> {
+        self.command_sender.clone()
+    }
+
     /// Retourne la position courante en secondes.
     pub fn position_secs(&self) -> f64 {
         let frames = self.position_frames.load(Ordering::Relaxed);

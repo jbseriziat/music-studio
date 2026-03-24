@@ -6,6 +6,7 @@ import {
   setSynthParam,
   noteOnCmd,
   noteOffCmd,
+  setMidiActiveTrack,
   type PresetInfo,
 } from '../utils/tauri-commands';
 
@@ -86,6 +87,8 @@ export const useSynthStore = create<SynthStore>((set, get) => ({
         createSynthTrack('Synth 1'),
         listSynthPresets(),
       ]);
+      // Informer le moteur MIDI de la piste active pour le routage des événements.
+      setMidiActiveTrack(trackId).catch(console.error);
       set({ trackId, presets, isInitializing: false });
     } catch (err) {
       console.error('[synthStore] init failed:', err);

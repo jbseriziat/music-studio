@@ -6,6 +6,7 @@ import { BpmControl } from './BpmControl';
 import { MetronomeToggle } from './MetronomeToggle';
 import { LoopButton } from './LoopButton';
 import { RecordButton } from './RecordButton';
+import { MidiIndicator } from './MidiIndicator';
 import { LevelGate } from '../shared/LevelGate';
 import { useTransport } from '../../hooks/useTransport';
 import { useTransportStore } from '../../stores/transportStore';
@@ -60,6 +61,11 @@ export function TransportBar() {
       {/* ─── Enregistrement (niveau 4+) ─────────────────────────────── */}
       <LevelGate level={4}>
         <RecordButton isRecording={isRecording} onToggle={toggleRecording} />
+      </LevelGate>
+
+      {/* ─── Indicateur MIDI (niveau 3+) ─────────────────────────────── */}
+      <LevelGate level={3}>
+        <MidiIndicator />
       </LevelGate>
     </div>
   );

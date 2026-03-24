@@ -10,6 +10,7 @@ pub mod synth;
 pub mod transport;
 
 use audio::AudioEngine;
+use midi::MidiEngine;
 use sampler::sample_bank::{ensure_samples_exist, load_sample_bank};
 use std::sync::Mutex;
 use tauri::Manager;
@@ -35,6 +36,9 @@ use commands::settings_commands::{get_audio_devices, get_profiles, save_profiles
 use commands::synth_commands::{
     add_midi_clip, create_synth_track, delete_midi_clip, list_synth_presets, load_synth_preset,
     note_off, note_on, set_synth_param, update_midi_clip_notes,
+};
+use commands::midi_commands::{
+    connect_midi_device, disconnect_midi_device, list_midi_devices, set_midi_active_track,
 };
 
 /// Commande de test IPC (Phase 0)
@@ -80,6 +84,8 @@ pub fn run() {
 
             app.manage(Mutex::new(engine));
             app.manage(Mutex::new(bank));
+            // Initialiser le moteur MIDI (connexion faite explicitement via `connect_midi_device`).
+            app.manage(Mutex::new(MidiEngine::new()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -135,6 +141,11 @@ pub fn run() {
             add_midi_clip,
             update_midi_clip_notes,
             delete_midi_clip,
+            // MIDI
+            list_midi_devices,
+            connect_midi_device,
+            disconnect_midi_device,
+            set_midi_active_track,
             // Settings
             get_audio_devices,
             get_profiles,

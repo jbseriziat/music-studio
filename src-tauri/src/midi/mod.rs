@@ -1,3 +1,6 @@
+pub mod midi_engine;
+pub use midi_engine::MidiEngine;
+
 use serde::{Deserialize, Serialize};
 
 /// Note MIDI dans un clip (position en beats relatif au début du clip).

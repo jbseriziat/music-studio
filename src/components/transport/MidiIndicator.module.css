@@ -1,0 +1,125 @@
+/* ── Conteneur ────────────────────────────────────────────────────────────────── */
+.container {
+  position: relative;
+}
+
+/* ── Bouton principal ─────────────────────────────────────────────────────────── */
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--color-surface-deep, #111);
+  border: 1px solid var(--color-border, #444);
+  border-radius: 6px;
+  color: var(--color-text-muted, #888);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: var(--color-surface, #1a1a1a);
+  color: var(--color-text, #ddd);
+}
+
+/* État actif (périphérique connecté) */
+.btnActive {
+  border-color: #9c27b0;
+  color: #ce93d8;
+}
+
+/* ── Indicateur de connexion (point coloré) ────────────────────────────────── */
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #888;
+  flex-shrink: 0;
+}
+
+.dotActive {
+  background: #9c27b0;
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* ── Dropdown ─────────────────────────────────────────────────────────────────── */
+.dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 200px;
+  background: var(--color-surface, #1a1a1a);
+  border: 1px solid var(--color-border, #444);
+  border-radius: 8px;
+  padding: 8px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.label {
+  margin: 0 0 4px;
+  font-size: 10px;
+  color: var(--color-text-muted, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.empty {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-muted, #666);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.device {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--color-text, #ddd);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.device:hover {
+  background: var(--color-surface-deep, #111);
+}
+
+.deviceConnected {
+  border-color: #9c27b0;
+  color: #ce93d8;
+}
+
+.refresh {
+  margin-top: 4px;
+  padding: 4px 8px;
+  font-size: 10px;
+  background: transparent;
+  border: 1px solid var(--color-border, #444);
+  border-radius: 4px;
+  color: var(--color-text-muted, #888);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.refresh:hover {
+  background: var(--color-surface-deep, #111);
+  color: var(--color-text, #ddd);
+}
