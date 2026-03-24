@@ -9,14 +9,20 @@ interface EffectRackProps {
 }
 
 const EFFECT_OPTIONS: { type: EffectType; label: string }[] = [
-  { type: 'reverb', label: '+ Reverb' },
-  { type: 'delay', label: '+ Delay' },
+  { type: 'reverb',     label: '+ Reverb' },
+  { type: 'delay',      label: '+ Delay' },
+  { type: 'eq',         label: '+ EQ' },
+  { type: 'compressor', label: '+ Comp' },
 ];
 
 // Paramètres par défaut pour l'initialisation côté store.
 const DEFAULT_PARAMS: Record<EffectType, Record<string, number>> = {
-  reverb: { room_size: 0.5, damping: 0.5, wet: 0.33, dry: 0.7 },
-  delay: { time_ms: 375, feedback: 0.4, wet: 0.3, dry: 1.0 },
+  reverb:     { room_size: 0.5, damping: 0.5, wet: 0.33, dry: 0.7 },
+  delay:      { time_ms: 375, feedback: 0.4, wet: 0.3, dry: 1.0 },
+  eq:         { low_gain: 0, low_freq: 200, low_q: 0.7,
+                mid_gain: 0, mid_freq: 1000, mid_q: 1.0,
+                high_gain: 0, high_freq: 5000, high_q: 0.7 },
+  compressor: { threshold: -20, ratio: 4, attack: 10, release: 100, makeup: 0 },
 };
 
 export function EffectRack({ trackId }: EffectRackProps) {

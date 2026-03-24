@@ -601,6 +601,9 @@ pub struct AudioEngine {
     pub effects_shadow: Mutex<std::collections::HashMap<(u32, u32), EffectShadowEntry>>,
     /// Compteur d'IDs d'effets (généré côté thread principal avant envoi).
     pub next_effect_id: AtomicU32,
+    /// Réduction de gain par compresseur : (track_id, effect_id) → bits f32 atomiques.
+    /// Mis à jour chaque frame par le thread audio ; lu par `get_compressor_gain_reduction`.
+    pub gain_reductions: Mutex<std::collections::HashMap<(u32, u32), Arc<AtomicU32>>>,
 }
 
 impl AudioEngine {
@@ -621,6 +624,7 @@ impl AudioEngine {
                     meter_report: Arc::new(Mutex::new(MeterReport::default())),
                     effects_shadow: Mutex::new(std::collections::HashMap::new()),
                     next_effect_id: AtomicU32::new(1),
+                    gain_reductions: Mutex::new(std::collections::HashMap::new()),
                 }
             }
         }
@@ -1096,6 +1100,7 @@ impl AudioEngine {
             meter_report,
             effects_shadow: Mutex::new(std::collections::HashMap::new()),
             next_effect_id: AtomicU32::new(1),
+            gain_reductions: Mutex::new(std::collections::HashMap::new()),
         })
     }
 

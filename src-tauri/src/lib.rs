@@ -16,10 +16,11 @@ use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
 use commands::audio_commands::{
-    add_clip, add_effect, clear_timeline, delete_clip, get_effect_params, move_clip, pause,
-    ping_audio, play, remove_effect, set_drum_rack_track_id, set_effect_bypass, set_effect_param,
-    set_loop, set_master_volume, set_metronome_volume, set_position, set_track_mute,
-    set_track_pan_cmd, set_track_solo, set_track_volume_db, stop,
+    add_clip, add_effect, clear_timeline, delete_clip, get_compressor_gain_reduction,
+    get_effect_params, move_clip, pause, ping_audio, play, remove_effect,
+    set_drum_rack_track_id, set_effect_bypass, set_effect_param, set_loop, set_master_volume,
+    set_metronome_volume, set_position, set_track_mute, set_track_pan_cmd, set_track_solo,
+    set_track_volume_db, stop,
 };
 use commands::drum_commands::{
     assign_drum_pad, get_bpm, get_current_step, list_drum_kits, load_drum_kit, set_bpm,
@@ -130,6 +131,7 @@ pub fn run() {
             set_effect_param,
             set_effect_bypass,
             get_effect_params,
+            get_compressor_gain_reduction,
             // Samples & pads
             trigger_pad,
             assign_pad_sample,

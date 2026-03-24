@@ -3,6 +3,8 @@ import { useEffectsStore, type EffectSlotState } from '../../stores/effectsStore
 import { removeEffect, setEffectBypass } from '../../utils/tauri-commands';
 import { ReverbUI } from './ReverbUI';
 import { DelayUI } from './DelayUI';
+import { EqUI } from './EqUI';
+import { CompressorUI } from './CompressorUI';
 import styles from './EffectSlot.module.css';
 
 interface EffectSlotProps {
@@ -13,6 +15,8 @@ interface EffectSlotProps {
 const EFFECT_LABELS: Record<string, string> = {
   reverb: 'Reverb',
   delay: 'Delay',
+  eq: 'EQ',
+  compressor: 'Comp',
 };
 
 export function EffectSlot({ trackId, slot }: EffectSlotProps) {
@@ -52,6 +56,12 @@ export function EffectSlot({ trackId, slot }: EffectSlotProps) {
           )}
           {slot.type === 'delay' && (
             <DelayUI trackId={trackId} effectId={slot.id} params={slot.params} />
+          )}
+          {slot.type === 'eq' && (
+            <EqUI trackId={trackId} effectId={slot.id} params={slot.params} />
+          )}
+          {slot.type === 'compressor' && (
+            <CompressorUI trackId={trackId} effectId={slot.id} params={slot.params} />
           )}
         </div>
       )}

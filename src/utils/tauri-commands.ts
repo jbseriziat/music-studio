@@ -389,7 +389,7 @@ export const setDrumRackTrackId = (trackId: number): Promise<void> =>
 // ── Effets ────────────────────────────────────────────────────────────────────
 
 /** Ajoute un effet à la chaîne d'une piste. Retourne l'ID de l'effet créé. */
-export const addEffect = (trackId: number, effectType: 'reverb' | 'delay'): Promise<number> =>
+export const addEffect = (trackId: number, effectType: 'reverb' | 'delay' | 'eq' | 'compressor'): Promise<number> =>
   invoke<number>('add_effect', { trackId, effectType });
 
 /** Supprime un effet de la chaîne d'une piste. */
@@ -417,3 +417,10 @@ export const getEffectParams = (
   effectId: number,
 ): Promise<Record<string, number>> =>
   invoke<Record<string, number>>('get_effect_params', { trackId, effectId });
+
+/** Retourne la réduction de gain courante d'un compresseur (dB ≥ 0). */
+export const getCompressorGainReduction = (
+  trackId: number,
+  effectId: number,
+): Promise<number> =>
+  invoke<number>('get_compressor_gain_reduction', { trackId, effectId });

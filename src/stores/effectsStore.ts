@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type EffectType = 'reverb' | 'delay';
+export type EffectType = 'reverb' | 'delay' | 'eq' | 'compressor';
 
 export interface EffectSlotState {
   id: number;
