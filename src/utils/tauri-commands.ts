@@ -424,3 +424,72 @@ export const getCompressorGainReduction = (
   effectId: number,
 ): Promise<number> =>
   invoke<number>('get_compressor_gain_reduction', { trackId, effectId });
+
+// ─── Enregistrement audio ──────────────────────────────────────────────────────
+
+export interface InputDeviceInfo {
+  name: string;
+}
+
+/** Retourne la liste des périphériques d'entrée audio. */
+export const listInputDevices = (): Promise<InputDeviceInfo[]> =>
+  invoke<InputDeviceInfo[]>('list_input_devices');
+
+/** Sélectionne le périphérique d'entrée audio (null = par défaut). */
+export const setInputDevice = (deviceName: string | null): Promise<void> =>
+  invoke<void>('set_input_device', { deviceName });
+
+/** Arme ou désarme une piste pour l'enregistrement. */
+export const armTrackCmd = (trackId: number, armed: boolean): Promise<void> =>
+  invoke<void>('arm_track', { trackId, armed });
+
+/** Active/désactive le monitoring micro. */
+export const setMonitoringCmd = (enabled: boolean): Promise<void> =>
+  invoke<void>('set_monitoring', { enabled });
+
+/** Démarre l'enregistrement. */
+export const startRecordingCmd = (): Promise<void> =>
+  invoke<void>('start_recording');
+
+/** Arrête l'enregistrement et retourne le chemin du WAV créé. */
+export const stopRecordingCmd = (projectName: string): Promise<string> =>
+  invoke<string>('stop_recording', { projectName });
+
+/** Retourne l'ID de la piste armée (null si aucune). */
+export const getArmedTrack = (): Promise<number | null> =>
+  invoke<number | null>('get_armed_track');
+
+/** Retourne true si un enregistrement est en cours. */
+export const isRecordingActive = (): Promise<boolean> =>
+  invoke<boolean>('is_recording_active');
+
+// ─── Export & Import audio ────────────────────────────────────────────────────
+
+export interface ExportOptions {
+  format: string;       // "wav"
+  normalize: boolean;
+  sample_rate: number;  // 44100 | 48000
+  bit_depth: number;    // 16 | 32
+}
+
+/**
+ * Importe un fichier audio (WAV, MP3, OGG, FLAC) dans la banque de samples.
+ * Retourne les infos du sample créé.
+ */
+export const importAudioFile = (sourcePath: string): Promise<SampleInfo> =>
+  invoke<SampleInfo>('import_audio_file', { sourcePath });
+
+/**
+ * Exporte le projet en WAV.
+ * Émet des événements Tauri "export://progress" { percent: number }.
+ */
+export const exportProjectCmd = (
+  project: MspProject,
+  path: string,
+  options: ExportOptions,
+): Promise<void> =>
+  invoke<void>('export_project', { project, path, options });
+
+/** Retourne le chemin d'export par défaut pour un projet donné. */
+export const getExportPath = (projectName: string): Promise<string> =>
+  invoke<string>('get_export_path', { projectName });

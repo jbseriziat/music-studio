@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   playAudio, pauseAudio, stopAudio, getPosition,
   setBpmCmd, setMetronomeCmd, setLoopCmd, setMetronomeVolumeCmd,
+  startRecordingCmd, stopRecordingCmd,
 } from '../utils/tauri-commands';
 
 interface TransportState {
@@ -27,6 +28,12 @@ interface TransportState {
   stop: () => Promise<void>;
   /** Interroge le backend pour mettre à jour la position (appelée par useTransport). */
   syncPosition: () => Promise<void>;
+
+  // ─── Actions enregistrement ────────────────────────────────────────────────
+  /** Démarre l'enregistrement micro (appelle le backend Rust). */
+  startRecording: () => Promise<void>;
+  /** Arrête l'enregistrement et retourne le chemin WAV créé. */
+  stopRecording: (projectName: string) => Promise<string>;
 
   // ─── Setters UI ───────────────────────────────────────────────────────────
   setPlaying: (playing: boolean) => void;
@@ -84,6 +91,29 @@ export const useTransportStore = create<TransportState>()((set) => ({
       set({ position: pos });
     } catch {
       // Ignorer les erreurs de polling silencieusement
+    }
+  },
+
+  // ─── Actions enregistrement ───────────────────────────────────────────────
+
+  startRecording: async () => {
+    try {
+      await startRecordingCmd();
+      set({ isRecording: true });
+    } catch (e) {
+      console.error('[TransportStore] startRecording error', e);
+    }
+  },
+
+  stopRecording: async (projectName: string) => {
+    try {
+      const wavPath = await stopRecordingCmd(projectName);
+      set({ isRecording: false });
+      return wavPath;
+    } catch (e) {
+      console.error('[TransportStore] stopRecording error', e);
+      set({ isRecording: false });
+      return '';
     }
   },
 

@@ -40,6 +40,8 @@ interface ProjectState {
   saveAs: (name: string) => Promise<void>;
   closeProject: () => void;
   markDirty: () => void;
+  /** Construit le MspProject depuis les stores courants (sans sauvegarder). */
+  buildProject: () => MspProject;
   /** Construit le MspProject depuis les stores courants et le sauvegarde. */
   buildAndSave: (path: string) => Promise<void>;
 }
@@ -382,13 +384,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     set({ projectName: name, projectPath: path });
   },
 
-  buildAndSave: async (path: string) => {
+  buildProject: () => {
     const { projectName } = get();
     const { pads } = usePadsStore.getState();
     const { steps, velocities, stepCount } = useDrumStore.getState();
     const bpm = useTransportStore.getState().bpm;
-
-    const project: MspProject = {
+    return {
       version: '1.0',
       name: projectName ?? 'Sans titre',
       profile_id: 'default',
@@ -403,7 +404,11 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       },
       instrument_tracks: buildInstrumentTracks(),
     };
+  },
 
+  buildAndSave: async (path: string) => {
+    const { buildProject } = get();
+    const project = buildProject();
     await saveProjectCmd(path, project);
     set({ isDirty: false, lastSavedAt: new Date().toISOString() });
   },

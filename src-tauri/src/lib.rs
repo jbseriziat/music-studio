@@ -9,6 +9,7 @@ pub mod sampler;
 pub mod synth;
 pub mod transport;
 
+use audio::recorder::Recorder;
 use audio::AudioEngine;
 use midi::MidiEngine;
 use sampler::sample_bank::{ensure_samples_exist, load_sample_bank};
@@ -43,6 +44,11 @@ use commands::synth_commands::{
 use commands::midi_commands::{
     connect_midi_device, disconnect_midi_device, list_midi_devices, set_midi_active_track,
 };
+use commands::recorder_commands::{
+    arm_track, get_armed_track, is_recording_active, list_input_devices, set_input_device,
+    set_monitoring, start_recording, stop_recording,
+};
+use commands::export_commands::{export_project, get_export_path, import_audio_file};
 
 /// Commande de test IPC (Phase 0)
 #[tauri::command]
@@ -99,10 +105,13 @@ pub fn run() {
 
             app.manage(Mutex::new(engine));
             app.manage(Mutex::new(bank));
-            // Initialiser le moteur MIDI (connexion faite explicitement via `connect_midi_device`).
+            // Initialiser le moteur MIDI.
             app.manage(Mutex::new(MidiEngine::new()));
+            // Initialiser le recorder (enregistrement micro).
+            app.manage(Mutex::new(Recorder::new()));
             Ok(())
         })
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             // IPC de test
             ping,
@@ -183,6 +192,19 @@ pub fn run() {
             get_projects_dir,
             get_project_path,
             delete_project,
+            // Enregistrement
+            list_input_devices,
+            set_input_device,
+            arm_track,
+            set_monitoring,
+            start_recording,
+            stop_recording,
+            get_armed_track,
+            is_recording_active,
+            // Export & Import
+            export_project,
+            import_audio_file,
+            get_export_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -6,6 +6,7 @@ import { addClipCmd, moveClipCmd, setTrackMuteCmd, setTrackSoloCmd } from '../..
 import { useTracksStore } from '../../stores/tracksStore';
 import styles from './Track.module.css';
 
+
 const SNAP_GRID = 0.5; // secondes
 
 interface TrackClip {
@@ -28,6 +29,8 @@ interface Props {
   color: string;
   muted: boolean;
   solo: boolean;
+  /** Piste armée pour l'enregistrement (visible niveau 4+). */
+  armed?: boolean;
   /** Type de la piste : "audio" | "drum_rack" | "instrument". */
   trackType?: string;
   clips: TrackClip[];
@@ -41,6 +44,8 @@ interface Props {
   onAddMidiClip?: () => void;
   /** Callback quand l'utilisateur double-clique sur un clip MIDI (pour ouvrir le piano roll). */
   onMidiClipDoubleClick?: (midiClipId: number) => void;
+  /** Callback pour armer/désarmer la piste (niveau 4+, uniquement pistes audio). */
+  onArmToggle?: () => void;
 }
 
 function snapToGrid(value: number, grid: number): number {
@@ -50,9 +55,9 @@ function snapToGrid(value: number, grid: number): number {
 let clipIdCounter = 100;
 
 export function Track({
-  id, trackIndex, name, color, muted, solo, trackType, clips,
+  id, trackIndex, name, color, muted, solo, armed, trackType, clips,
   pixelsPerSec, selectedClipId, onSelectClip, onDeleteTrack,
-  onDoubleClickHeader, onAddMidiClip, onMidiClipDoubleClick,
+  onDoubleClickHeader, onAddMidiClip, onMidiClipDoubleClick, onArmToggle,
 }: Props) {
   const { addClip, moveClip, updateTrack } = useTracksStore();
   const draggingRef = useRef<{ clipId: string; startX: number; startPos: number } | null>(null);
@@ -239,6 +244,19 @@ export function Track({
             aria-label="Ajouter un clip MIDI"
           >
             +
+          </button>
+        )}
+
+        {/* ─── Bouton Arm (enregistrement) — niveau 4+, pistes audio ─── */}
+        {onArmToggle && trackType !== 'drum_rack' && trackType !== 'instrument' && (
+          <button
+            className={`${styles.armBtn} ${armed ? styles.active : ''}`}
+            onClick={(e) => { e.stopPropagation(); onArmToggle(); }}
+            title={armed ? 'Désarmer la piste' : 'Armer pour l\'enregistrement'}
+            aria-label="Arm"
+            aria-pressed={armed}
+          >
+            ●
           </button>
         )}
 

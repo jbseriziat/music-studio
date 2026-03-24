@@ -8,7 +8,7 @@ import { useTransportStore } from '../../stores/transportStore';
 import { useFeatureLevel } from '../../hooks/useFeatureLevel';
 import { useSynthStore } from '../../stores/synthStore';
 import { usePianoRollStore } from '../../stores/pianoRollStore';
-import { deleteClipCmd, addMidiClip } from '../../utils/tauri-commands';
+import { deleteClipCmd, addMidiClip, armTrackCmd } from '../../utils/tauri-commands';
 import type { Clip } from '../../types/audio';
 import styles from './Timeline.module.css';
 
@@ -40,6 +40,8 @@ export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
   const tracksAreaRef = useRef<HTMLDivElement>(null);
   const [tracksHeight, setTracksHeight] = useState(0);
   const [pixelsPerSec, setPixelsPerSec] = useState(DEFAULT_PIXELS_PER_SEC);
+  /** Index de la piste armée pour l'enregistrement (-1 = aucune). Niveau 4+. */
+  const [armedTrackIdx, setArmedTrackIdx] = useState<number>(-1);
 
   // Mesurer la hauteur de la zone pistes pour le playhead.
   useEffect(() => {
@@ -121,6 +123,21 @@ export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
     const color = TRACK_COLORS[n % TRACK_COLORS.length];
     addTrack(`Piste ${++trackIdCounter}`, 'audio', color);
   }, [tracks.length, addTrack]);
+
+  /**
+   * Arme/désarme une piste pour l'enregistrement (niveau 4+).
+   * Une seule piste armée à la fois.
+   */
+  const handleArmToggle = useCallback(async (idx: number) => {
+    const isNowArmed = armedTrackIdx !== idx;
+    // Désarmer l'ancienne piste si différente.
+    if (armedTrackIdx >= 0 && armedTrackIdx !== idx) {
+      armTrackCmd(armedTrackIdx, false).catch(console.error);
+    }
+    // Armer/désarmer la nouvelle.
+    armTrackCmd(idx, isNowArmed).catch(console.error);
+    setArmedTrackIdx(isNowArmed ? idx : -1);
+  }, [armedTrackIdx]);
 
   // ── Gestion des clips MIDI ─────────────────────────────────────────────────
 
@@ -214,6 +231,7 @@ export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
                 color={track.color}
                 muted={track.muted}
                 solo={track.solo}
+                armed={armedTrackIdx === idx}
                 clips={clips
                   .filter((c) => c.trackId === track.id)
                   .map((c) => ({
@@ -242,6 +260,11 @@ export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
                 }
                 onMidiClipDoubleClick={
                   track.type === 'instrument' ? handleMidiClipDoubleClick : undefined
+                }
+                onArmToggle={
+                  currentLevel >= 4 && track.type === 'audio'
+                    ? () => handleArmToggle(idx)
+                    : undefined
                 }
               />
             ))}

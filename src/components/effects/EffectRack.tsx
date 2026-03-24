@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useEffectsStore, type EffectType } from '../../stores/effectsStore';
+import { useEffectsStore, type EffectSlotState, type EffectType } from '../../stores/effectsStore';
 import { addEffect } from '../../utils/tauri-commands';
 import { EffectSlot } from './EffectSlot';
 import styles from './EffectRack.module.css';
@@ -15,6 +15,9 @@ const EFFECT_OPTIONS: { type: EffectType; label: string }[] = [
   { type: 'compressor', label: '+ Comp' },
 ];
 
+// Référence stable pour éviter l'infinite loop Zustand quand la piste n'a pas encore d'effets.
+const EMPTY_SLOTS: EffectSlotState[] = [];
+
 // Paramètres par défaut pour l'initialisation côté store.
 const DEFAULT_PARAMS: Record<EffectType, Record<string, number>> = {
   reverb:     { room_size: 0.5, damping: 0.5, wet: 0.33, dry: 0.7 },
@@ -26,7 +29,7 @@ const DEFAULT_PARAMS: Record<EffectType, Record<string, number>> = {
 };
 
 export function EffectRack({ trackId }: EffectRackProps) {
-  const slots = useEffectsStore((s) => s.trackEffects[trackId] ?? []);
+  const slots = useEffectsStore((s) => s.trackEffects[trackId] ?? EMPTY_SLOTS);
   const addSlot = useEffectsStore((s) => s.addEffect);
 
   const handleAdd = useCallback(
