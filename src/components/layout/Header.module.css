@@ -46,7 +46,7 @@
   font-size: var(--font-size-sm);
 }
 
-/* ─── Zone droite : profil ─── */
+/* ─── Zone droite : profil + paramètres ─── */
 
 .right {
   flex: 0 0 auto;
@@ -54,6 +54,29 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ─── Bouton paramètres ─── */
+
+.settingsBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), border-color var(--transition);
+  flex-shrink: 0;
+}
+
+.settingsBtn:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
 }
 
 .profile {

@@ -19,17 +19,14 @@ export function ProjectMenu() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Ctrl+S → sauvegarder
+  // Note : Ctrl+S est géré globalement par useKeyboardShortcuts (dans App.tsx).
+
+  // Écouter l'événement personnalisé 'project:openBrowser' (émis par Ctrl+Shift+S).
   useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        handleSave();
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isProjectOpen]);
+    const handler = () => setShowBrowser(true);
+    window.addEventListener('project:openBrowser', handler);
+    return () => window.removeEventListener('project:openBrowser', handler);
+  }, []);
 
   // Fermer le menu au clic extérieur
   useEffect(() => {

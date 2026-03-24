@@ -8,7 +8,7 @@ import { useTransportStore } from '../../stores/transportStore';
 import { useFeatureLevel } from '../../hooks/useFeatureLevel';
 import { useSynthStore } from '../../stores/synthStore';
 import { usePianoRollStore } from '../../stores/pianoRollStore';
-import { deleteClipCmd, addMidiClip, armTrackCmd } from '../../utils/tauri-commands';
+import { addMidiClip, armTrackCmd } from '../../utils/tauri-commands';
 import type { AutomationParameter } from '../../stores/automationStore';
 import type { Clip } from '../../types/audio';
 import styles from './Timeline.module.css';
@@ -104,25 +104,18 @@ export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
     }
   }, [currentLevel, hasInstrumentTrack, addTrack]);
 
-  // Touche Suppr pour effacer le clip sélectionné (frontend + moteur audio).
+  // Zoom via les touches +/- (événement CustomEvent émis par useKeyboardShortcuts).
   useEffect(() => {
-    const handler = async (e: KeyboardEvent) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipId) {
-        const match = selectedClipId.match(/\d+/);
-        if (match) {
-          try {
-            await deleteClipCmd(Number(match[0]));
-          } catch {
-            // Peut ne pas être dans le moteur, ignorer.
-          }
-        }
-        useTracksStore.getState().removeClip(selectedClipId);
-        selectClip(null);
-      }
+    const handler = (e: Event) => {
+      const dir = (e as CustomEvent<{ direction: 'in' | 'out' }>).detail.direction;
+      const factor = dir === 'in' ? 1.25 : 0.8;
+      setPixelsPerSec((prev) =>
+        Math.max(MIN_PIXELS_PER_SEC, Math.min(MAX_PIXELS_PER_SEC, prev * factor)),
+      );
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [selectedClipId, selectClip]);
+    window.addEventListener('timeline:zoom', handler);
+    return () => window.removeEventListener('timeline:zoom', handler);
+  }, []);
 
   const handleAddTrack = useCallback(() => {
     const n = tracks.length;
