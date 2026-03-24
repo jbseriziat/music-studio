@@ -117,6 +117,17 @@ pub enum AudioCommand {
 
     /// Efface tous les clips MIDI d'une piste (nouveau projet, chargement).
     ClearMidiClips { track_id: u32 },
+
+    // ── Mixer : volume, panoramique ───────────────────────────────────────────
+
+    /// Règle le volume linéaire d'une piste (0.0 = silence, 1.0 = nominal, > 1.0 = gain).
+    SetTrackVolume { track_id: u32, volume: f32 },
+
+    /// Règle le panoramique d'une piste (-1.0 = gauche, 0.0 = centre, +1.0 = droite).
+    SetTrackPan { track_id: u32, pan: f32 },
+
+    /// Enregistre l'identifiant numérique de la piste Drum Rack (pour le metering).
+    SetDrumRackTrackId { track_id: u32 },
 }
 
 /// Paramètre de synthé encodé comme enum (pas de String → pas d'allocation/déallocation dans le callback).

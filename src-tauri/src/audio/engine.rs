@@ -12,6 +12,7 @@ use std::sync::{
 use super::commands::AudioCommand;
 use super::config::AudioConfig;
 use crate::midi::MidiClip;
+use crate::mixer::{MeterReport, TrackMeterData};
 use crate::synth::SynthEngine;
 use crate::transport::Metronome;
 
@@ -19,6 +20,8 @@ use crate::transport::Metronome;
 const MAX_SYNTH_TRACKS: usize = 4;
 /// Valeur sentinelle : aucune piste assignée à ce slot.
 const NO_TRACK: u32 = u32::MAX;
+/// Intervalle de calcul des VU-mètres en frames (~33ms à 48kHz).
+const METER_INTERVAL_FRAMES: u32 = 1600;
 
 /// ID réservé pour le sample de click métronome accent (premier temps).
 const METRO_ACCENT_ID: u32 = 253;
@@ -200,6 +203,36 @@ struct AudioCallbackState {
     track_solo: [bool; 64],
     /// Cache : vrai si au moins une piste est en solo.
     any_track_solo: bool,
+
+    // ─── Volume / Panoramique par piste ───────────────────────────────────────
+    /// Volume linéaire par piste (1.0 = nominal). Indexé par track_id % 64.
+    track_volumes: [f32; 64],
+    /// Panoramique par piste (-1.0 gauche, 0.0 centre, +1.0 droite). Indexé par track_id % 64.
+    track_pans: [f32; 64],
+    /// ID de la piste Drum Rack (pour le metering). NO_TRACK si non assigné.
+    drum_rack_track_id: u32,
+
+    // ─── Metering VU-mètre ────────────────────────────────────────────────────
+    /// Peak accumulé par slot (track_id % 64) — remis à 0 après chaque rapport.
+    track_peak_l: [f32; 64],
+    track_peak_r: [f32; 64],
+    /// Somme des carrés (RMS) par slot.
+    track_rms_sum_l: [f64; 64],
+    track_rms_sum_r: [f64; 64],
+    /// Nombre de samples accumulés par slot.
+    track_rms_count: [u32; 64],
+    /// Track ID réel pour chaque slot (NO_TRACK = inactif).
+    track_known_ids: [u32; 64],
+    /// Peak master accumulé.
+    master_peak_l: f32,
+    master_peak_r: f32,
+    master_rms_sum_l: f64,
+    master_rms_sum_r: f64,
+    master_rms_count: u32,
+    /// Compteur de frames depuis le dernier rapport de VU-mètres.
+    meter_frame_count: u32,
+    /// Rapport de VU-mètres partagé avec le thread principal (try_lock dans le callback).
+    meter_report: Arc<Mutex<MeterReport>>,
 
     // ─── Synthétiseur (pistes Instrument) ─────────────────────────────────────
     /// Pool de MAX_SYNTH_TRACKS moteurs synthé pré-alloués.
@@ -488,8 +521,32 @@ impl AudioCallbackState {
                     self.midi_clips[slot].clear();
                 }
             }
+
+            // ── Mixer ─────────────────────────────────────────────────────────
+            AudioCommand::SetTrackVolume { track_id, volume } => {
+                self.track_volumes[(track_id % 64) as usize] = volume.clamp(0.0, 4.0);
+            }
+            AudioCommand::SetTrackPan { track_id, pan } => {
+                self.track_pans[(track_id % 64) as usize] = pan.clamp(-1.0, 1.0);
+            }
+            AudioCommand::SetDrumRackTrackId { track_id } => {
+                self.drum_rack_track_id = track_id;
+            }
         }
     }
+}
+
+// ─── Fonctions de panoramique (puissance constante) ──────────────────────────
+#[inline]
+fn pan_left(pan: f32) -> f32 {
+    let angle = (pan.clamp(-1.0, 1.0) + 1.0) * std::f32::consts::FRAC_PI_4;
+    angle.cos()
+}
+
+#[inline]
+fn pan_right(pan: f32) -> f32 {
+    let angle = (pan.clamp(-1.0, 1.0) + 1.0) * std::f32::consts::FRAC_PI_4;
+    angle.sin()
 }
 
 // ─── Moteur audio public ──────────────────────────────────────────────────────
@@ -506,6 +563,8 @@ pub struct AudioEngine {
     pub current_step: Arc<AtomicU8>,
     /// BPM courant comme bits f64 (lecture lock-free depuis le thread principal).
     pub bpm_bits: Arc<AtomicU64>,
+    /// Rapport de VU-mètres — lu par le thread de métrologie (lib.rs) toutes les 33ms.
+    pub meter_report: Arc<Mutex<MeterReport>>,
 }
 
 impl AudioEngine {
@@ -523,6 +582,7 @@ impl AudioEngine {
                     is_playing: Arc::new(AtomicBool::new(false)),
                     current_step: Arc::new(AtomicU8::new(0)),
                     bpm_bits: Arc::new(AtomicU64::new(120.0f64.to_bits())),
+                    meter_report: Arc::new(Mutex::new(MeterReport::default())),
                 }
             }
         }
@@ -559,6 +619,9 @@ impl AudioEngine {
         let is_playing_atomic_cb = Arc::clone(&is_playing_atomic);
         let current_step_atomic_cb = Arc::clone(&current_step_atomic);
         let bpm_atomic_cb = Arc::clone(&bpm_atomic);
+
+        let meter_report = Arc::new(Mutex::new(MeterReport::default()));
+        let meter_report_cb = Arc::clone(&meter_report);
 
         // Pré-allouer l'état du callback (pas d'allocation dans le callback lui-même).
         let mut samples: Vec<Option<SampleData>> = Vec::with_capacity(256);
@@ -609,6 +672,24 @@ impl AudioEngine {
             track_muted: [false; 64],
             track_solo: [false; 64],
             any_track_solo: false,
+            // Volume / Pan
+            track_volumes: [1.0f32; 64],
+            track_pans: [0.0f32; 64],
+            drum_rack_track_id: NO_TRACK,
+            // Metering
+            track_peak_l: [0.0f32; 64],
+            track_peak_r: [0.0f32; 64],
+            track_rms_sum_l: [0.0f64; 64],
+            track_rms_sum_r: [0.0f64; 64],
+            track_rms_count: [0u32; 64],
+            track_known_ids: [NO_TRACK; 64],
+            master_peak_l: 0.0,
+            master_peak_r: 0.0,
+            master_rms_sum_l: 0.0,
+            master_rms_sum_r: 0.0,
+            master_rms_count: 0,
+            meter_frame_count: 0,
+            meter_report: meter_report_cb,
             // Synthétiseur : pré-allouer MAX_SYNTH_TRACKS moteurs.
             synth_engines: (0..MAX_SYNTH_TRACKS).map(|_| SynthEngine::new(sample_rate)).collect(),
             synth_track_ids: vec![NO_TRACK; MAX_SYNTH_TRACKS],
@@ -722,26 +803,53 @@ impl AudioEngine {
                         if state.track_muted[tidx] { continue; }
                         if state.any_track_solo && !state.track_solo[tidx] { continue; }
                         let (sl, sr) = state.synth_engines[i].process_frame(state.sample_rate);
-                        left  += sl;
-                        right += sr;
+                        let vol = state.track_volumes[tidx];
+                        let pan = state.track_pans[tidx];
+                        let tl = sl * vol * pan_left(pan);
+                        let tr = sr * vol * pan_right(pan);
+                        left  += tl;
+                        right += tr;
+                        // Accumulate track meter
+                        state.track_known_ids[tidx] = track_id;
+                        if tl.abs() > state.track_peak_l[tidx] { state.track_peak_l[tidx] = tl.abs(); }
+                        if tr.abs() > state.track_peak_r[tidx] { state.track_peak_r[tidx] = tr.abs(); }
+                        state.track_rms_sum_l[tidx] += (tl * tl) as f64;
+                        state.track_rms_sum_r[tidx] += (tr * tr) as f64;
+                        state.track_rms_count[tidx] += 1;
                     }
 
                     // Voix de clips (timeline).
                     if state.is_playing {
                         for (cid, voice) in &mut state.clip_voices {
                             // Vérifier mute / solo avant de mixer.
-                            let audible = if let Some(clip) = state.clips.iter().find(|c| c.id == *cid) {
-                                let idx = (clip.track_id % 64) as usize;
-                                let muted = state.track_muted[idx];
-                                let solo_ok = !state.any_track_solo || state.track_solo[idx];
+                            let clip_info = state.clips.iter().find(|c| c.id == *cid)
+                                .map(|c| (c.track_id, (c.track_id % 64) as usize));
+                            let audible = if let Some((_, tidx)) = clip_info {
+                                let muted = state.track_muted[tidx];
+                                let solo_ok = !state.any_track_solo || state.track_solo[tidx];
                                 !muted && solo_ok
                             } else {
                                 false
                             };
                             if audible {
                                 let (l, r) = voice.next_stereo(&state.samples);
-                                left += l;
-                                right += r;
+                                if let Some((track_id, tidx)) = clip_info {
+                                    let vol = state.track_volumes[tidx];
+                                    let pan = state.track_pans[tidx];
+                                    let tl = l * vol * pan_left(pan);
+                                    let tr = r * vol * pan_right(pan);
+                                    left += tl;
+                                    right += tr;
+                                    state.track_known_ids[tidx] = track_id;
+                                    if tl.abs() > state.track_peak_l[tidx] { state.track_peak_l[tidx] = tl.abs(); }
+                                    if tr.abs() > state.track_peak_r[tidx] { state.track_peak_r[tidx] = tr.abs(); }
+                                    state.track_rms_sum_l[tidx] += (tl * tl) as f64;
+                                    state.track_rms_sum_r[tidx] += (tr * tr) as f64;
+                                    state.track_rms_count[tidx] += 1;
+                                } else {
+                                    left += l;
+                                    right += r;
+                                }
                             } else {
                                 // Avancer quand même pour conserver la sync.
                                 voice.position += 1;
@@ -798,12 +906,33 @@ impl AudioEngine {
                         }
 
                         // ── Voix de drum rack (avec pitch) ─────────────────────
+                        let mut drum_l = 0.0f32;
+                        let mut drum_r = 0.0f32;
                         for voice in &mut state.drum_voices {
                             let (l, r) = voice.next_stereo(&state.samples);
-                            left += l;
-                            right += r;
+                            drum_l += l;
+                            drum_r += r;
                         }
                         state.drum_voices.retain(|v| !v.is_done(&state.samples));
+                        // Appliquer vol/pan de la piste drum rack et accumuler le meter.
+                        if state.drum_rack_track_id != NO_TRACK {
+                            let tidx = (state.drum_rack_track_id % 64) as usize;
+                            let vol = state.track_volumes[tidx];
+                            let pan = state.track_pans[tidx];
+                            let tl = drum_l * vol * pan_left(pan);
+                            let tr = drum_r * vol * pan_right(pan);
+                            left += tl;
+                            right += tr;
+                            state.track_known_ids[tidx] = state.drum_rack_track_id;
+                            if tl.abs() > state.track_peak_l[tidx] { state.track_peak_l[tidx] = tl.abs(); }
+                            if tr.abs() > state.track_peak_r[tidx] { state.track_peak_r[tidx] = tr.abs(); }
+                            state.track_rms_sum_l[tidx] += (tl * tl) as f64;
+                            state.track_rms_sum_r[tidx] += (tr * tr) as f64;
+                            state.track_rms_count[tidx] += 1;
+                        } else {
+                            left += drum_l;
+                            right += drum_r;
+                        }
 
                         // ── Voix de métronome ──────────────────────────────────
                         if let Some(ref mut mv) = state.metronome_voice {
@@ -840,8 +969,59 @@ impl AudioEngine {
                     }
 
                     // Clamp + volume master.
-                    let out_l = (left * state.master_volume).clamp(-1.0, 1.0);
-                    let out_r = (right * state.master_volume).clamp(-1.0, 1.0);
+                    let pre_l = left * state.master_volume;
+                    let pre_r = right * state.master_volume;
+
+                    // Accumulate master meter (avant clamp).
+                    let abs_l = pre_l.abs();
+                    let abs_r = pre_r.abs();
+                    if abs_l > state.master_peak_l { state.master_peak_l = abs_l; }
+                    if abs_r > state.master_peak_r { state.master_peak_r = abs_r; }
+                    state.master_rms_sum_l += (pre_l * pre_l) as f64;
+                    state.master_rms_sum_r += (pre_r * pre_r) as f64;
+                    state.master_rms_count += 1;
+
+                    // Rapport VU-mètres toutes les METER_INTERVAL_FRAMES frames.
+                    state.meter_frame_count += 1;
+                    if state.meter_frame_count >= METER_INTERVAL_FRAMES {
+                        state.meter_frame_count = 0;
+                        if let Ok(mut report) = state.meter_report.try_lock() {
+                            // Master
+                            let mc = state.master_rms_count.max(1) as f64;
+                            report.master.peak_l = state.master_peak_l;
+                            report.master.peak_r = state.master_peak_r;
+                            report.master.rms_l  = (state.master_rms_sum_l / mc).sqrt() as f32;
+                            report.master.rms_r  = (state.master_rms_sum_r / mc).sqrt() as f32;
+                            // Tracks
+                            report.tracks.clear();
+                            for i in 0..64usize {
+                                if state.track_known_ids[i] == NO_TRACK { continue; }
+                                let tc = state.track_rms_count[i].max(1) as f64;
+                                report.tracks.push(TrackMeterData {
+                                    track_id: state.track_known_ids[i],
+                                    peak_l: state.track_peak_l[i],
+                                    peak_r: state.track_peak_r[i],
+                                    rms_l: (state.track_rms_sum_l[i] / tc).sqrt() as f32,
+                                    rms_r: (state.track_rms_sum_r[i] / tc).sqrt() as f32,
+                                });
+                                // Reset accumulateurs de piste
+                                state.track_peak_l[i] = 0.0;
+                                state.track_peak_r[i] = 0.0;
+                                state.track_rms_sum_l[i] = 0.0;
+                                state.track_rms_sum_r[i] = 0.0;
+                                state.track_rms_count[i] = 0;
+                            }
+                        }
+                        // Reset accumulateurs master (même si try_lock a échoué)
+                        state.master_peak_l = 0.0;
+                        state.master_peak_r = 0.0;
+                        state.master_rms_sum_l = 0.0;
+                        state.master_rms_sum_r = 0.0;
+                        state.master_rms_count = 0;
+                    }
+
+                    let out_l = pre_l.clamp(-1.0, 1.0);
+                    let out_r = pre_r.clamp(-1.0, 1.0);
 
                     if output_channels >= 2 {
                         chunk[0] = out_l;
@@ -874,6 +1054,7 @@ impl AudioEngine {
             is_playing: is_playing_atomic,
             current_step: current_step_atomic,
             bpm_bits: bpm_atomic,
+            meter_report,
         })
     }
 

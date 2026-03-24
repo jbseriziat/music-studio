@@ -371,3 +371,17 @@ export const disconnectMidiDevice = (): Promise<void> =>
 /** Définit la piste synthé active pour le routage MIDI. */
 export const setMidiActiveTrack = (trackId: number): Promise<void> =>
   invoke<void>('set_midi_active_track', { trackId });
+
+// ── Mixer ─────────────────────────────────────────────────────────────────────
+
+/** Règle le volume d'une piste en dB (-60 = silence, 0 = nominal, +6 = gain). */
+export const setTrackVolumeDb = (trackId: number, volumeDb: number): Promise<void> =>
+  invoke<void>('set_track_volume_db', { trackId, volumeDb });
+
+/** Règle le panoramique d'une piste (-1.0 gauche, 0.0 centre, +1.0 droite). */
+export const setTrackPanCmd = (trackId: number, pan: number): Promise<void> =>
+  invoke<void>('set_track_pan_cmd', { trackId, pan });
+
+/** Enregistre l'ID numérique de la piste Drum Rack (pour le metering). */
+export const setDrumRackTrackId = (trackId: number): Promise<void> =>
+  invoke<void>('set_drum_rack_track_id', { trackId });

@@ -169,3 +169,55 @@ pub fn clear_timeline(engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
     engine.inner().lock().map_err(|e| e.to_string())?.send_command(AudioCommand::ClearTimeline);
     Ok(())
 }
+
+/// Règle le volume d'une piste en dB (−∞ à +6 dB). Converti en linéaire avant envoi.
+#[tauri::command]
+pub fn set_track_volume_db(
+    track_id: u32,
+    volume_db: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    let volume = if volume_db <= -60.0 {
+        0.0f32
+    } else {
+        10.0f32.powf(volume_db / 20.0)
+    };
+    engine
+        .inner()
+        .lock()
+        .map_err(|e| e.to_string())?
+        .send_command(AudioCommand::SetTrackVolume { track_id, volume });
+    Ok(())
+}
+
+/// Règle le panoramique d'une piste (−1.0 gauche, 0.0 centre, +1.0 droite).
+#[tauri::command]
+pub fn set_track_pan_cmd(
+    track_id: u32,
+    pan: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    if !(-1.0f32..=1.0f32).contains(&pan) {
+        return Err(format!("Pan invalide : {pan} (attendu -1.0–1.0)"));
+    }
+    engine
+        .inner()
+        .lock()
+        .map_err(|e| e.to_string())?
+        .send_command(AudioCommand::SetTrackPan { track_id, pan });
+    Ok(())
+}
+
+/// Enregistre l'identifiant numérique de la piste Drum Rack (pour le metering des VU-mètres).
+#[tauri::command]
+pub fn set_drum_rack_track_id(
+    track_id: u32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine
+        .inner()
+        .lock()
+        .map_err(|e| e.to_string())?
+        .send_command(AudioCommand::SetDrumRackTrackId { track_id });
+    Ok(())
+}

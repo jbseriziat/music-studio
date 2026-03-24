@@ -12,12 +12,13 @@ pub mod transport;
 use audio::AudioEngine;
 use midi::MidiEngine;
 use sampler::sample_bank::{ensure_samples_exist, load_sample_bank};
-use std::sync::Mutex;
-use tauri::Manager;
+use std::sync::{Arc, Mutex};
+use tauri::{Emitter, Manager};
 
 use commands::audio_commands::{
-    add_clip, clear_timeline, delete_clip, move_clip, pause, ping_audio, play, set_loop,
-    set_master_volume, set_metronome_volume, set_position, set_track_mute, set_track_solo, stop,
+    add_clip, clear_timeline, delete_clip, move_clip, pause, ping_audio, play, set_drum_rack_track_id,
+    set_loop, set_master_volume, set_metronome_volume, set_position, set_track_mute, set_track_pan_cmd,
+    set_track_solo, set_track_volume_db, stop,
 };
 use commands::drum_commands::{
     assign_drum_pad, get_bpm, get_current_step, list_drum_kits, load_drum_kit, set_bpm,
@@ -82,6 +83,18 @@ pub fn run() {
                 }
             }
 
+            // ── Thread de métrologie VU-mètres (~30 fps) ──────────────────────
+            {
+                let meter_report = Arc::clone(&engine.meter_report);
+                let handle = app.handle().clone();
+                std::thread::spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_millis(33));
+                    if let Ok(report) = meter_report.lock() {
+                        let _ = handle.emit("audio://meters", report.clone());
+                    }
+                });
+            }
+
             app.manage(Mutex::new(engine));
             app.manage(Mutex::new(bank));
             // Initialiser le moteur MIDI (connexion faite explicitement via `connect_midi_device`).
@@ -107,6 +120,9 @@ pub fn run() {
             set_track_mute,
             set_track_solo,
             set_metronome_volume,
+            set_track_volume_db,
+            set_track_pan_cmd,
+            set_drum_rack_track_id,
             // Samples & pads
             trigger_pad,
             assign_pad_sample,

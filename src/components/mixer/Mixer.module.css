@@ -1,0 +1,20 @@
+.mixer {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--color-bg);
+  min-height: 260px;
+  height: 100%;
+}
+
+.separator {
+  width: 2px;
+  background: var(--color-border);
+  border-radius: 1px;
+  flex-shrink: 0;
+  margin: 4px 4px;
+}
