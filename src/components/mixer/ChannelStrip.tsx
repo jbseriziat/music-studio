@@ -4,6 +4,7 @@ import { useMixerStore, LINEAR_TO_DB, DB_TO_LINEAR } from '../../stores/mixerSto
 import { Knob } from '../shared/Knob';
 import { Fader } from '../shared/Fader';
 import { VuMeter } from './VuMeter';
+import { EffectRack } from '../effects/EffectRack';
 import { setTrackVolumeDb, setTrackPanCmd, setTrackMuteCmd, setTrackSoloCmd } from '../../utils/tauri-commands';
 import styles from './ChannelStrip.module.css';
 
@@ -79,9 +80,9 @@ export function ChannelStrip({
         </span>
       </div>
 
-      {/* Zone effets (placeholder phase 4.2) */}
-      <div className={styles.effectsPlaceholder}>
-        <span className={styles.effectsLabel}>FX</span>
+      {/* Chaîne d'effets (phase 4.2) */}
+      <div className={styles.effectsArea}>
+        <EffectRack trackId={String(trackIndex)} />
       </div>
 
       {/* Panoramique */}

@@ -1,7 +1,9 @@
-use std::sync::Mutex;
+use std::collections::HashMap;
+use std::sync::{atomic::Ordering, Mutex};
 use tauri::State;
 
-use crate::audio::{AudioCommand, AudioEngine};
+use crate::audio::{AudioCommand, AudioEngine, EffectShadowEntry};
+use crate::effects::{delay::Delay, reverb::Reverb, BoxedEffect, Effect};
 
 #[tauri::command]
 pub fn play(engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
@@ -220,4 +222,119 @@ pub fn set_drum_rack_track_id(
         .map_err(|e| e.to_string())?
         .send_command(AudioCommand::SetDrumRackTrackId { track_id });
     Ok(())
+}
+
+/// Ajoute un effet (reverb ou delay) à la chaîne d'une piste.
+/// Retourne l'ID de l'effet créé.
+#[tauri::command]
+pub fn add_effect(
+    track_id: u32,
+    effect_type: String,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<u32, String> {
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    let effect_id = eng.next_effect_id.fetch_add(1, Ordering::Relaxed);
+    let sample_rate = eng.config.sample_rate;
+
+    let (boxed, params): (BoxedEffect, Vec<(String, f32)>) = match effect_type.as_str() {
+        "reverb" => {
+            let rev = Reverb::new();
+            let params = rev.get_all_params();
+            (BoxedEffect(Box::new(rev)), params)
+        }
+        "delay" => {
+            let del = Delay::new(sample_rate);
+            let params = del.get_all_params();
+            (BoxedEffect(Box::new(del)), params)
+        }
+        other => return Err(format!("Type d'effet inconnu : {other}")),
+    };
+
+    // Mettre à jour le shadow state (lecture thread principal).
+    let mut shadow = eng.effects_shadow.lock().map_err(|e| e.to_string())?;
+    let mut params_map = HashMap::new();
+    for (k, v) in params {
+        params_map.insert(k, v);
+    }
+    shadow.insert(
+        (track_id, effect_id),
+        EffectShadowEntry { effect_type, params: params_map, bypass: false },
+    );
+    drop(shadow);
+
+    eng.send_command(AudioCommand::AddEffect { track_id, effect_id, effect: boxed });
+    Ok(effect_id)
+}
+
+/// Supprime un effet de la chaîne d'une piste.
+#[tauri::command]
+pub fn remove_effect(
+    track_id: u32,
+    effect_id: u32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    let mut shadow = eng.effects_shadow.lock().map_err(|e| e.to_string())?;
+    shadow.remove(&(track_id, effect_id));
+    drop(shadow);
+    eng.send_command(AudioCommand::RemoveEffect { track_id, effect_id });
+    Ok(())
+}
+
+/// Définit un paramètre d'un effet.
+#[tauri::command]
+pub fn set_effect_param(
+    track_id: u32,
+    effect_id: u32,
+    param_name: String,
+    value: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    // Mettre à jour le shadow state.
+    if let Ok(mut shadow) = eng.effects_shadow.lock() {
+        if let Some(entry) = shadow.get_mut(&(track_id, effect_id)) {
+            entry.params.insert(param_name.clone(), value);
+        }
+    }
+    eng.send_command(AudioCommand::SetEffectParam {
+        track_id,
+        effect_id,
+        param: param_name,
+        value,
+    });
+    Ok(())
+}
+
+/// Active/désactive le bypass d'un effet.
+#[tauri::command]
+pub fn set_effect_bypass(
+    track_id: u32,
+    effect_id: u32,
+    bypass: bool,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    if let Ok(mut shadow) = eng.effects_shadow.lock() {
+        if let Some(entry) = shadow.get_mut(&(track_id, effect_id)) {
+            entry.bypass = bypass;
+        }
+    }
+    eng.send_command(AudioCommand::SetEffectBypass { track_id, effect_id, bypass });
+    Ok(())
+}
+
+/// Retourne tous les paramètres d'un effet (lecture depuis le shadow state).
+#[tauri::command]
+pub fn get_effect_params(
+    track_id: u32,
+    effect_id: u32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<HashMap<String, f32>, String> {
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    let shadow = eng.effects_shadow.lock().map_err(|e| e.to_string())?;
+    match shadow.get(&(track_id, effect_id)) {
+        Some(entry) => Ok(entry.params.clone()),
+        None => Err(format!("Effet {effect_id} introuvable sur la piste {track_id}")),
+    }
 }

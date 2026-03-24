@@ -385,3 +385,35 @@ export const setTrackPanCmd = (trackId: number, pan: number): Promise<void> =>
 /** Enregistre l'ID numérique de la piste Drum Rack (pour le metering). */
 export const setDrumRackTrackId = (trackId: number): Promise<void> =>
   invoke<void>('set_drum_rack_track_id', { trackId });
+
+// ── Effets ────────────────────────────────────────────────────────────────────
+
+/** Ajoute un effet à la chaîne d'une piste. Retourne l'ID de l'effet créé. */
+export const addEffect = (trackId: number, effectType: 'reverb' | 'delay'): Promise<number> =>
+  invoke<number>('add_effect', { trackId, effectType });
+
+/** Supprime un effet de la chaîne d'une piste. */
+export const removeEffect = (trackId: number, effectId: number): Promise<void> =>
+  invoke<void>('remove_effect', { trackId, effectId });
+
+/** Définit un paramètre d'un effet. */
+export const setEffectParam = (
+  trackId: number,
+  effectId: number,
+  paramName: string,
+  value: number,
+): Promise<void> => invoke<void>('set_effect_param', { trackId, effectId, paramName, value });
+
+/** Active/désactive le bypass d'un effet. */
+export const setEffectBypass = (
+  trackId: number,
+  effectId: number,
+  bypass: boolean,
+): Promise<void> => invoke<void>('set_effect_bypass', { trackId, effectId, bypass });
+
+/** Retourne tous les paramètres d'un effet. */
+export const getEffectParams = (
+  trackId: number,
+  effectId: number,
+): Promise<Record<string, number>> =>
+  invoke<Record<string, number>>('get_effect_params', { trackId, effectId });

@@ -38,19 +38,9 @@
   white-space: nowrap;
 }
 
-.effectsPlaceholder {
+.effectsArea {
   width: 100%;
   min-height: 24px;
-  border: 1px dashed var(--color-border);
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.effectsLabel {
-  font-size: 9px;
-  color: var(--color-text-muted, #888);
 }
 
 .panRow {

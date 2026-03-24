@@ -5,12 +5,13 @@ use ringbuf::{
     HeapRb,
 };
 use std::sync::{
-    atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering},
+    atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering},
     Arc, Mutex,
 };
 
 use super::commands::AudioCommand;
 use super::config::AudioConfig;
+use crate::effects::EffectChain;
 use crate::midi::MidiClip;
 use crate::mixer::{MeterReport, TrackMeterData};
 use crate::synth::SynthEngine;
@@ -241,6 +242,10 @@ struct AudioCallbackState {
     synth_track_ids: Vec<u32>,
     /// MIDI clips par slot de synthé (piano roll). Un Vec<MidiClip> par slot.
     midi_clips: Vec<Vec<MidiClip>>,
+
+    // ─── Chaînes d'effets (insert) par piste ──────────────────────────────────
+    /// 64 chaînes, indexées par track_id % 64. Pré-allouées, vides par défaut.
+    effect_chains: Vec<EffectChain>,
 
     // ─── Atomics partagés avec le thread principal ────────────────────────────
     position_atomic: Arc<AtomicU64>,
@@ -532,6 +537,25 @@ impl AudioCallbackState {
             AudioCommand::SetDrumRackTrackId { track_id } => {
                 self.drum_rack_track_id = track_id;
             }
+
+            // ── Effets ────────────────────────────────────────────────────────
+            AudioCommand::AddEffect { track_id, effect_id, effect } => {
+                let tidx = (track_id % 64) as usize;
+                self.effect_chains[tidx].add_with_id(effect_id, effect.0);
+            }
+            AudioCommand::RemoveEffect { track_id, effect_id } => {
+                let tidx = (track_id % 64) as usize;
+                self.effect_chains[tidx].remove(effect_id);
+            }
+            AudioCommand::SetEffectParam { track_id, effect_id, param, value } => {
+                let tidx = (track_id % 64) as usize;
+                self.effect_chains[tidx].set_param(effect_id, &param, value);
+                // La String param est droppée ici depuis le callback (acceptable, rare).
+            }
+            AudioCommand::SetEffectBypass { track_id, effect_id, bypass } => {
+                let tidx = (track_id % 64) as usize;
+                self.effect_chains[tidx].set_bypass(effect_id, bypass);
+            }
         }
     }
 }
@@ -547,6 +571,13 @@ fn pan_left(pan: f32) -> f32 {
 fn pan_right(pan: f32) -> f32 {
     let angle = (pan.clamp(-1.0, 1.0) + 1.0) * std::f32::consts::FRAC_PI_4;
     angle.sin()
+}
+
+// ─── Shadow state pour les effets (accès depuis le thread principal) ──────────
+pub struct EffectShadowEntry {
+    pub effect_type: String,
+    pub params: std::collections::HashMap<String, f32>,
+    pub bypass: bool,
 }
 
 // ─── Moteur audio public ──────────────────────────────────────────────────────
@@ -565,6 +596,11 @@ pub struct AudioEngine {
     pub bpm_bits: Arc<AtomicU64>,
     /// Rapport de VU-mètres — lu par le thread de métrologie (lib.rs) toutes les 33ms.
     pub meter_report: Arc<Mutex<MeterReport>>,
+    /// Shadow state des effets — lecture depuis le thread principal sans passer par le callback.
+    /// Key : (track_id, effect_id) → (type, params, bypass).
+    pub effects_shadow: Mutex<std::collections::HashMap<(u32, u32), EffectShadowEntry>>,
+    /// Compteur d'IDs d'effets (généré côté thread principal avant envoi).
+    pub next_effect_id: AtomicU32,
 }
 
 impl AudioEngine {
@@ -583,6 +619,8 @@ impl AudioEngine {
                     current_step: Arc::new(AtomicU8::new(0)),
                     bpm_bits: Arc::new(AtomicU64::new(120.0f64.to_bits())),
                     meter_report: Arc::new(Mutex::new(MeterReport::default())),
+                    effects_shadow: Mutex::new(std::collections::HashMap::new()),
+                    next_effect_id: AtomicU32::new(1),
                 }
             }
         }
@@ -694,6 +732,8 @@ impl AudioEngine {
             synth_engines: (0..MAX_SYNTH_TRACKS).map(|_| SynthEngine::new(sample_rate)).collect(),
             synth_track_ids: vec![NO_TRACK; MAX_SYNTH_TRACKS],
             midi_clips: vec![Vec::new(); MAX_SYNTH_TRACKS],
+            // Chaînes d'effets : 64 slots vides pré-alloués.
+            effect_chains: (0..64).map(|_| EffectChain::new()).collect(),
             // Atomics
             position_atomic: position_atomic_cb,
             is_playing_atomic: is_playing_atomic_cb,
@@ -736,6 +776,8 @@ impl AudioEngine {
                 for chunk in data.chunks_mut(output_channels) {
                     let mut left = 0.0f32;
                     let mut right = 0.0f32;
+                    // Buffer par piste pour appliquer les effets après agrégation complète.
+                    let mut track_bufs = [(0.0f32, 0.0f32); 64usize];
 
                     // Voix de pads.
                     for voice in &mut state.pad_voices {
@@ -805,17 +847,9 @@ impl AudioEngine {
                         let (sl, sr) = state.synth_engines[i].process_frame(state.sample_rate);
                         let vol = state.track_volumes[tidx];
                         let pan = state.track_pans[tidx];
-                        let tl = sl * vol * pan_left(pan);
-                        let tr = sr * vol * pan_right(pan);
-                        left  += tl;
-                        right += tr;
-                        // Accumulate track meter
+                        track_bufs[tidx].0 += sl * vol * pan_left(pan);
+                        track_bufs[tidx].1 += sr * vol * pan_right(pan);
                         state.track_known_ids[tidx] = track_id;
-                        if tl.abs() > state.track_peak_l[tidx] { state.track_peak_l[tidx] = tl.abs(); }
-                        if tr.abs() > state.track_peak_r[tidx] { state.track_peak_r[tidx] = tr.abs(); }
-                        state.track_rms_sum_l[tidx] += (tl * tl) as f64;
-                        state.track_rms_sum_r[tidx] += (tr * tr) as f64;
-                        state.track_rms_count[tidx] += 1;
                     }
 
                     // Voix de clips (timeline).
@@ -836,16 +870,9 @@ impl AudioEngine {
                                 if let Some((track_id, tidx)) = clip_info {
                                     let vol = state.track_volumes[tidx];
                                     let pan = state.track_pans[tidx];
-                                    let tl = l * vol * pan_left(pan);
-                                    let tr = r * vol * pan_right(pan);
-                                    left += tl;
-                                    right += tr;
+                                    track_bufs[tidx].0 += l * vol * pan_left(pan);
+                                    track_bufs[tidx].1 += r * vol * pan_right(pan);
                                     state.track_known_ids[tidx] = track_id;
-                                    if tl.abs() > state.track_peak_l[tidx] { state.track_peak_l[tidx] = tl.abs(); }
-                                    if tr.abs() > state.track_peak_r[tidx] { state.track_peak_r[tidx] = tr.abs(); }
-                                    state.track_rms_sum_l[tidx] += (tl * tl) as f64;
-                                    state.track_rms_sum_r[tidx] += (tr * tr) as f64;
-                                    state.track_rms_count[tidx] += 1;
                                 } else {
                                     left += l;
                                     right += r;
@@ -914,21 +941,14 @@ impl AudioEngine {
                             drum_r += r;
                         }
                         state.drum_voices.retain(|v| !v.is_done(&state.samples));
-                        // Appliquer vol/pan de la piste drum rack et accumuler le meter.
+                        // Appliquer vol/pan de la piste drum rack → track_bufs.
                         if state.drum_rack_track_id != NO_TRACK {
                             let tidx = (state.drum_rack_track_id % 64) as usize;
                             let vol = state.track_volumes[tidx];
                             let pan = state.track_pans[tidx];
-                            let tl = drum_l * vol * pan_left(pan);
-                            let tr = drum_r * vol * pan_right(pan);
-                            left += tl;
-                            right += tr;
+                            track_bufs[tidx].0 += drum_l * vol * pan_left(pan);
+                            track_bufs[tidx].1 += drum_r * vol * pan_right(pan);
                             state.track_known_ids[tidx] = state.drum_rack_track_id;
-                            if tl.abs() > state.track_peak_l[tidx] { state.track_peak_l[tidx] = tl.abs(); }
-                            if tr.abs() > state.track_peak_r[tidx] { state.track_peak_r[tidx] = tr.abs(); }
-                            state.track_rms_sum_l[tidx] += (tl * tl) as f64;
-                            state.track_rms_sum_r[tidx] += (tr * tr) as f64;
-                            state.track_rms_count[tidx] += 1;
                         } else {
                             left += drum_l;
                             right += drum_r;
@@ -966,6 +986,25 @@ impl AudioEngine {
                         if state.position_frames % 512 == 0 {
                             state.position_atomic.store(state.position_frames, Ordering::Relaxed);
                         }
+                    }
+
+                    // ── Effets par piste + metering centralisé ───────────────
+                    for tidx in 0..64usize {
+                        let (tl, tr) = track_bufs[tidx];
+                        // Appliquer la chaîne d'effets (pass-through si vide).
+                        let (el, er) = state.effect_chains[tidx].process(tl, tr);
+                        // Metering après effets (uniquement pour les pistes connues).
+                        if state.track_known_ids[tidx] != NO_TRACK {
+                            let ea = el.abs();
+                            let ea_r = er.abs();
+                            if ea > state.track_peak_l[tidx] { state.track_peak_l[tidx] = ea; }
+                            if ea_r > state.track_peak_r[tidx] { state.track_peak_r[tidx] = ea_r; }
+                            state.track_rms_sum_l[tidx] += (el * el) as f64;
+                            state.track_rms_sum_r[tidx] += (er * er) as f64;
+                            state.track_rms_count[tidx] += 1;
+                        }
+                        left += el;
+                        right += er;
                     }
 
                     // Clamp + volume master.
@@ -1055,6 +1094,8 @@ impl AudioEngine {
             current_step: current_step_atomic,
             bpm_bits: bpm_atomic,
             meter_report,
+            effects_shadow: Mutex::new(std::collections::HashMap::new()),
+            next_effect_id: AtomicU32::new(1),
         })
     }
 
