@@ -23,6 +23,10 @@ use commands::audio_commands::{
     set_metronome_volume, set_position, set_track_mute, set_track_pan_cmd, set_track_solo,
     set_track_volume_db, stop,
 };
+use commands::automation_commands::{
+    add_automation_point, clear_track_automation, delete_automation_point,
+    get_automation_lane, update_automation_point,
+};
 use commands::drum_commands::{
     assign_drum_pad, get_bpm, get_current_step, list_drum_kits, load_drum_kit, set_bpm,
     set_drum_pad_pitch, set_drum_pad_volume, set_drum_pattern, set_drum_step, set_drum_step_count,
@@ -205,6 +209,12 @@ pub fn run() {
             export_project,
             import_audio_file,
             get_export_path,
+            // Automation
+            add_automation_point,
+            update_automation_point,
+            delete_automation_point,
+            get_automation_lane,
+            clear_track_automation,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -9,6 +9,7 @@ import { useFeatureLevel } from '../../hooks/useFeatureLevel';
 import { useSynthStore } from '../../stores/synthStore';
 import { usePianoRollStore } from '../../stores/pianoRollStore';
 import { deleteClipCmd, addMidiClip, armTrackCmd } from '../../utils/tauri-commands';
+import type { AutomationParameter } from '../../stores/automationStore';
 import type { Clip } from '../../types/audio';
 import styles from './Timeline.module.css';
 
@@ -42,6 +43,11 @@ export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
   const [pixelsPerSec, setPixelsPerSec] = useState(DEFAULT_PIXELS_PER_SEC);
   /** Index de la piste armée pour l'enregistrement (-1 = aucune). Niveau 4+. */
   const [armedTrackIdx, setArmedTrackIdx] = useState<number>(-1);
+  /**
+   * Paramètre d'automation visible par piste.
+   * null = lane cachée, 'volume'|'pan' = lane visible avec ce paramètre.
+   */
+  const [automationVisible, setAutomationVisible] = useState<Record<string, AutomationParameter | null>>({});
 
   // Mesurer la hauteur de la zone pistes pour le playhead.
   useEffect(() => {
@@ -138,6 +144,14 @@ export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
     armTrackCmd(idx, isNowArmed).catch(console.error);
     setArmedTrackIdx(isNowArmed ? idx : -1);
   }, [armedTrackIdx]);
+
+  /** Affiche/masque la lane d'automation d'une piste. */
+  const handleToggleAutomation = useCallback((trackId: string) => {
+    setAutomationVisible((prev) => ({
+      ...prev,
+      [trackId]: prev[trackId] != null ? null : 'volume',
+    }));
+  }, []);
 
   // ── Gestion des clips MIDI ─────────────────────────────────────────────────
 
@@ -266,6 +280,20 @@ export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
                     ? () => handleArmToggle(idx)
                     : undefined
                 }
+                automationParameter={
+                  currentLevel >= 4 ? (automationVisible[track.id] ?? null) : null
+                }
+                onToggleAutomation={
+                  currentLevel >= 4
+                    ? () => handleToggleAutomation(track.id)
+                    : undefined
+                }
+                onChangeAutomationParam={
+                  currentLevel >= 4
+                    ? (p) => setAutomationVisible((prev) => ({ ...prev, [track.id]: p }))
+                    : undefined
+                }
+                totalSecs={TOTAL_SECS}
               />
             ))}
           </div>

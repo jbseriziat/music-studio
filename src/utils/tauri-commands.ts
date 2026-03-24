@@ -66,6 +66,17 @@ export interface ProjectMidiNote {
   velocity: number;
 }
 
+export interface ProjectAutomationPoint {
+  id: number;
+  time_beats: number;
+  value: number;
+}
+
+export interface ProjectAutomationLane {
+  parameter: string;
+  points: ProjectAutomationPoint[];
+}
+
 export interface ProjectTrack {
   id: string;
   name: string;
@@ -77,6 +88,8 @@ export interface ProjectTrack {
   clips: ProjectClip[];
   /** Type de la piste : "audio" | "drum_rack" | "instrument". Absent = "audio". */
   track_type?: string;
+  /** Lanes d'automation (Phase 4). */
+  automations?: ProjectAutomationLane[];
 }
 
 export interface ProjectClip {
@@ -493,3 +506,43 @@ export const exportProjectCmd = (
 /** Retourne le chemin d'export par défaut pour un projet donné. */
 export const getExportPath = (projectName: string): Promise<string> =>
   invoke<string>('get_export_path', { projectName });
+
+// ─── Automation ───────────────────────────────────────────────────────────────
+
+/** Ajoute un point d'automation. Retourne l'ID du point créé. */
+export const addAutomationPoint = (
+  trackId: number,
+  parameter: string,
+  timeBeats: number,
+  value: number,
+): Promise<number> =>
+  invoke<number>('add_automation_point', { trackId, parameter, timeBeats, value });
+
+/** Met à jour la position et la valeur d'un point existant. */
+export const updateAutomationPoint = (
+  trackId: number,
+  parameter: string,
+  pointId: number,
+  timeBeats: number,
+  value: number,
+): Promise<void> =>
+  invoke<void>('update_automation_point', { trackId, parameter, pointId, timeBeats, value });
+
+/** Supprime un point d'automation. */
+export const deleteAutomationPoint = (
+  trackId: number,
+  parameter: string,
+  pointId: number,
+): Promise<void> =>
+  invoke<void>('delete_automation_point', { trackId, parameter, pointId });
+
+/** Retourne tous les points d'une lane, triés par timeBeats. */
+export const getAutomationLane = (
+  trackId: number,
+  parameter: string,
+): Promise<ProjectAutomationPoint[]> =>
+  invoke<ProjectAutomationPoint[]>('get_automation_lane', { trackId, parameter });
+
+/** Efface toutes les lanes d'automation d'une piste (chargement de projet). */
+export const clearTrackAutomation = (trackId: number): Promise<void> =>
+  invoke<void>('clear_track_automation', { trackId });

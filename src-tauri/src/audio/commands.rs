@@ -144,6 +144,17 @@ pub enum AudioCommand {
 
     /// Active/désactive le bypass d'un effet.
     SetEffectBypass { track_id: u32, effect_id: u32, bypass: bool },
+
+    // ── Automation ────────────────────────────────────────────────────────────
+
+    /// Remplace la lane d'automation d'un paramètre pour une piste.
+    /// `points` est trié par beats croissant ; l'allocation vient du thread principal.
+    SetAutomationPoints {
+        track_id: u32,
+        param: crate::audio::automation::AutomationParam,
+        /// Paires (beats, valeur_normalisée 0.0–1.0) triées par beats.
+        points: Vec<(f64, f32)>,
+    },
 }
 
 /// Paramètre de synthé encodé comme enum (pas de String → pas d'allocation/déallocation dans le callback).

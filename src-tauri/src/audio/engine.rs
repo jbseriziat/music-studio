@@ -247,6 +247,12 @@ struct AudioCallbackState {
     /// 64 chaînes, indexées par track_id % 64. Pré-allouées, vides par défaut.
     effect_chains: Vec<EffectChain>,
 
+    // ─── Automation par piste ──────────────────────────────────────────────────
+    /// Volume automatisé : paires (beats, valeur 0.0–1.0) triées. Index = track_id % 64.
+    automation_volume: Vec<Vec<(f64, f32)>>,
+    /// Panoramique automatisé : paires (beats, valeur 0.0–1.0) triées. Index = track_id % 64.
+    automation_pan: Vec<Vec<(f64, f32)>>,
+
     // ─── Atomics partagés avec le thread principal ────────────────────────────
     position_atomic: Arc<AtomicU64>,
     is_playing_atomic: Arc<AtomicBool>,
@@ -556,6 +562,20 @@ impl AudioCallbackState {
                 let tidx = (track_id % 64) as usize;
                 self.effect_chains[tidx].set_bypass(effect_id, bypass);
             }
+
+            // ── Automation ────────────────────────────────────────────────────
+            AudioCommand::SetAutomationPoints { track_id, param, points } => {
+                let tidx = (track_id % 64) as usize;
+                match param {
+                    crate::audio::automation::AutomationParam::Volume => {
+                        // Drop de l'ancienne Vec + remplacement (allocation côté thread principal).
+                        self.automation_volume[tidx] = points;
+                    }
+                    crate::audio::automation::AutomationParam::Pan => {
+                        self.automation_pan[tidx] = points;
+                    }
+                }
+            }
         }
     }
 }
@@ -604,6 +624,11 @@ pub struct AudioEngine {
     /// Réduction de gain par compresseur : (track_id, effect_id) → bits f32 atomiques.
     /// Mis à jour chaque frame par le thread audio ; lu par `get_compressor_gain_reduction`.
     pub gain_reductions: Mutex<std::collections::HashMap<(u32, u32), Arc<AtomicU32>>>,
+    /// Shadow state de l'automation — géré depuis le thread principal (Tauri commands).
+    /// Key : (track_id_numeric, parameter_str) → Vec<(point_id, time_beats, value)>
+    pub automation_shadow: std::collections::HashMap<(u32, String), Vec<(u32, f64, f32)>>,
+    /// Compteur d'IDs de points d'automation (thread principal uniquement).
+    pub next_auto_point_id: AtomicU32,
 }
 
 impl AudioEngine {
@@ -625,6 +650,8 @@ impl AudioEngine {
                     effects_shadow: Mutex::new(std::collections::HashMap::new()),
                     next_effect_id: AtomicU32::new(1),
                     gain_reductions: Mutex::new(std::collections::HashMap::new()),
+                    automation_shadow: std::collections::HashMap::new(),
+                    next_auto_point_id: AtomicU32::new(1),
                 }
             }
         }
@@ -738,6 +765,9 @@ impl AudioEngine {
             midi_clips: vec![Vec::new(); MAX_SYNTH_TRACKS],
             // Chaînes d'effets : 64 slots vides pré-alloués.
             effect_chains: (0..64).map(|_| EffectChain::new()).collect(),
+            // Automation : 64 lanes vides pré-allouées.
+            automation_volume: vec![Vec::new(); 64],
+            automation_pan: vec![Vec::new(); 64],
             // Atomics
             position_atomic: position_atomic_cb,
             is_playing_atomic: is_playing_atomic_cb,
@@ -782,6 +812,13 @@ impl AudioEngine {
                     let mut right = 0.0f32;
                     // Buffer par piste pour appliquer les effets après agrégation complète.
                     let mut track_bufs = [(0.0f32, 0.0f32); 64usize];
+
+                    // Position en beats pour l'automation (samples_per_step * 4 = samples par beat).
+                    let auto_pos_beats = if state.samples_per_step > 0.0 {
+                        state.position_frames as f64 / (state.samples_per_step * 4.0)
+                    } else {
+                        0.0
+                    };
 
                     // Voix de pads.
                     for voice in &mut state.pad_voices {
@@ -849,8 +886,13 @@ impl AudioEngine {
                         if state.track_muted[tidx] { continue; }
                         if state.any_track_solo && !state.track_solo[tidx] { continue; }
                         let (sl, sr) = state.synth_engines[i].process_frame(state.sample_rate);
-                        let vol = state.track_volumes[tidx];
-                        let pan = state.track_pans[tidx];
+                        let vol = crate::audio::automation::get_auto_value(
+                            &state.automation_volume[tidx], auto_pos_beats,
+                        ).unwrap_or(state.track_volumes[tidx]);
+                        let pan_norm = crate::audio::automation::get_auto_value(
+                            &state.automation_pan[tidx], auto_pos_beats,
+                        );
+                        let pan = pan_norm.map(|v| v * 2.0 - 1.0).unwrap_or(state.track_pans[tidx]);
                         track_bufs[tidx].0 += sl * vol * pan_left(pan);
                         track_bufs[tidx].1 += sr * vol * pan_right(pan);
                         state.track_known_ids[tidx] = track_id;
@@ -872,8 +914,13 @@ impl AudioEngine {
                             if audible {
                                 let (l, r) = voice.next_stereo(&state.samples);
                                 if let Some((track_id, tidx)) = clip_info {
-                                    let vol = state.track_volumes[tidx];
-                                    let pan = state.track_pans[tidx];
+                                    let vol = crate::audio::automation::get_auto_value(
+                                        &state.automation_volume[tidx], auto_pos_beats,
+                                    ).unwrap_or(state.track_volumes[tidx]);
+                                    let pan_norm = crate::audio::automation::get_auto_value(
+                                        &state.automation_pan[tidx], auto_pos_beats,
+                                    );
+                                    let pan = pan_norm.map(|v| v * 2.0 - 1.0).unwrap_or(state.track_pans[tidx]);
                                     track_bufs[tidx].0 += l * vol * pan_left(pan);
                                     track_bufs[tidx].1 += r * vol * pan_right(pan);
                                     state.track_known_ids[tidx] = track_id;
@@ -948,8 +995,13 @@ impl AudioEngine {
                         // Appliquer vol/pan de la piste drum rack → track_bufs.
                         if state.drum_rack_track_id != NO_TRACK {
                             let tidx = (state.drum_rack_track_id % 64) as usize;
-                            let vol = state.track_volumes[tidx];
-                            let pan = state.track_pans[tidx];
+                            let vol = crate::audio::automation::get_auto_value(
+                                &state.automation_volume[tidx], auto_pos_beats,
+                            ).unwrap_or(state.track_volumes[tidx]);
+                            let pan_norm = crate::audio::automation::get_auto_value(
+                                &state.automation_pan[tidx], auto_pos_beats,
+                            );
+                            let pan = pan_norm.map(|v| v * 2.0 - 1.0).unwrap_or(state.track_pans[tidx]);
                             track_bufs[tidx].0 += drum_l * vol * pan_left(pan);
                             track_bufs[tidx].1 += drum_r * vol * pan_right(pan);
                             state.track_known_ids[tidx] = state.drum_rack_track_id;
@@ -1101,6 +1153,8 @@ impl AudioEngine {
             effects_shadow: Mutex::new(std::collections::HashMap::new()),
             next_effect_id: AtomicU32::new(1),
             gain_reductions: Mutex::new(std::collections::HashMap::new()),
+            automation_shadow: std::collections::HashMap::new(),
+            next_auto_point_id: AtomicU32::new(1),
         })
     }
 

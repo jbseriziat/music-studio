@@ -1,4 +1,5 @@
 pub mod audio_commands;
+pub mod automation_commands;
 pub mod drum_commands;
 pub mod export_commands;
 pub mod midi_commands;
