@@ -7,6 +7,7 @@ import { FilterUI } from './FilterUI';
 import { PresetSelector } from './PresetSelector';
 import { Knob } from '../shared/Knob';
 import { useSynthStore } from '../../stores/synthStore';
+import { usePianoRollStore } from '../../stores/pianoRollStore';
 
 /**
  * Panneau Synthétiseur (niveau 3+).
@@ -15,6 +16,11 @@ import { useSynthStore } from '../../stores/synthStore';
  */
 export function SynthPanel() {
   const { init, params, setParam, noteOn, noteOff, isInitializing, trackId } = useSynthStore();
+  const { openForTrack } = usePianoRollStore();
+
+  const handleOpenPianoRoll = useCallback(() => {
+    if (trackId !== null) openForTrack(trackId);
+  }, [trackId, openForTrack]);
 
   // Initialise le synthé la première fois
   useEffect(() => {
@@ -98,6 +104,15 @@ export function SynthPanel() {
             {trackId !== null && (
               <span className={styles.trackBadge}>Piste #{trackId}</span>
             )}
+            <button
+              className={styles.pianoRollBtn}
+              onClick={handleOpenPianoRoll}
+              disabled={trackId === null}
+              title="Ouvrir le Piano Roll"
+              aria-label="Ouvrir le Piano Roll"
+            >
+              🎼 Piano Roll
+            </button>
           </div>
           <PresetSelector />
         </div>

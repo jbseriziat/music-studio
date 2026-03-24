@@ -11,6 +11,7 @@ import { SampleBrowser } from './components/sample-browser/SampleBrowser';
 import { SoundPadGrid } from './components/sound-pad/SoundPadGrid';
 import { DrumRack } from './components/drum-rack/DrumRack';
 import { SynthPanel } from './components/synth/SynthPanel';
+import { PianoRoll } from './components/piano-roll/PianoRoll';
 import { Timeline } from './components/timeline/Timeline';
 import styles from './App.module.css';
 
@@ -29,6 +30,9 @@ function App() {
 
   return (
     <>
+      {/* Piano Roll (overlay modal, niveau 3+) */}
+      <PianoRoll />
+
       {/* Écran de sélection de profil si aucun profil actif */}
       {!activeProfileId && <ProfileSelector fullscreen />}
 

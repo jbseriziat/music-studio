@@ -33,7 +33,8 @@ use commands::sample_commands::{
 };
 use commands::settings_commands::{get_audio_devices, get_profiles, save_profiles};
 use commands::synth_commands::{
-    create_synth_track, list_synth_presets, load_synth_preset, note_off, note_on, set_synth_param,
+    add_midi_clip, create_synth_track, delete_midi_clip, list_synth_presets, load_synth_preset,
+    note_off, note_on, set_synth_param, update_midi_clip_notes,
 };
 
 /// Commande de test IPC (Phase 0)
@@ -130,6 +131,10 @@ pub fn run() {
             set_synth_param,
             load_synth_preset,
             list_synth_presets,
+            // Piano Roll / MIDI clips
+            add_midi_clip,
+            update_midi_clip_notes,
+            delete_midi_clip,
             // Settings
             get_audio_devices,
             get_profiles,

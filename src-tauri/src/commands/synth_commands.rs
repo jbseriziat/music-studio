@@ -3,13 +3,16 @@ use crate::audio::{
     engine::AudioEngine,
 };
 use crate::synth::{get_builtin_presets, SynthPreset};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use tauri::State;
 
 /// Compteur monotone pour les IDs de pistes synthé (commence à 100 pour éviter les conflits).
 static NEXT_SYNTH_TRACK_ID: AtomicU32 = AtomicU32::new(100);
+
+/// Compteur monotone pour les IDs de clips MIDI.
+static NEXT_CLIP_ID: AtomicU32 = AtomicU32::new(1);
 
 /// Informations sur un preset retournées au frontend.
 #[derive(Debug, Clone, Serialize)]
@@ -125,4 +128,73 @@ pub fn list_synth_presets() -> Result<Vec<PresetInfo>, String> {
         .map(PresetInfo::from)
         .collect();
     Ok(infos)
+}
+
+// ── Piano Roll / MIDI clips ────────────────────────────────────────────────────
+
+/// Note MIDI transmise depuis le piano roll (camelCase JS → snake_case Rust via Tauri).
+#[derive(Debug, Deserialize)]
+pub struct MidiNoteDto {
+    pub id: u32,
+    pub note: u8,
+    pub start_beats: f64,
+    pub duration_beats: f64,
+    pub velocity: u8,
+}
+
+/// Crée un nouveau clip MIDI vide sur une piste instrument.
+/// Retourne l'ID du clip créé.
+#[tauri::command]
+pub fn add_midi_clip(
+    track_id: u32,
+    start_beats: f64,
+    length_beats: f64,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<u32, String> {
+    let clip_id = NEXT_CLIP_ID.fetch_add(1, Ordering::SeqCst);
+    let clip = crate::midi::MidiClip {
+        id: clip_id,
+        start_beats,
+        length_beats,
+        notes: Vec::new(),
+    };
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    eng.send_command(AudioCommand::AddMidiClip { track_id, clip });
+    Ok(clip_id)
+}
+
+/// Remplace toutes les notes d'un clip MIDI existant.
+/// Appelé par le piano roll à chaque modification (ajout, déplacement, suppression de note).
+#[tauri::command]
+pub fn update_midi_clip_notes(
+    track_id: u32,
+    clip_id: u32,
+    notes: Vec<MidiNoteDto>,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    let midi_notes: Vec<crate::midi::MidiNote> = notes
+        .into_iter()
+        .map(|n| crate::midi::MidiNote {
+            id: n.id,
+            note: n.note,
+            start_beats: n.start_beats,
+            duration_beats: n.duration_beats,
+            velocity: n.velocity,
+        })
+        .collect();
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    eng.send_command(AudioCommand::UpdateMidiClipNotes { track_id, clip_id, notes: midi_notes });
+    Ok(())
+}
+
+/// Supprime un clip MIDI d'une piste instrument.
+#[tauri::command]
+pub fn delete_midi_clip(
+    track_id: u32,
+    clip_id: u32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    eng.send_command(AudioCommand::DeleteMidiClip { track_id, clip_id });
+    Ok(())
 }

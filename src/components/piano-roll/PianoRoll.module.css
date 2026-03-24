@@ -1,0 +1,112 @@
+/* ── Overlay modal ─────────────────────────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface, #1a1a1a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 12px;
+  width: min(900px, 100%);
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+/* ── En-tête ────────────────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border, #333);
+  flex-shrink: 0;
+}
+
+.icon {
+  font-size: 18px;
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text, #eee);
+}
+
+.trackBadge {
+  font-size: 10px;
+  color: var(--color-text-muted, #777);
+  background: var(--color-surface-deep, #0a0a0a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.closeBtn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-border, #444);
+  border-radius: 6px;
+  background: var(--color-surface-deep, #111);
+  color: var(--color-text-muted, #888);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+
+.closeBtn:hover {
+  background: #c0392b;
+  color: #fff;
+  border-color: #c0392b;
+}
+
+/* ── Corps ──────────────────────────────────────────────────────────────────── */
+.body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.scrollArea {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+}
+
+.velocityWrapper {
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+/* ── Pied de page ───────────────────────────────────────────────────────────── */
+.hint {
+  margin: 0;
+  padding: 6px 14px;
+  font-size: 10px;
+  color: var(--color-text-muted, #666);
+  border-top: 1px solid var(--color-border, #333);
+  text-align: center;
+  flex-shrink: 0;
+}

@@ -299,3 +299,26 @@ export const loadSynthPresetCmd = (trackId: number, presetName: string): Promise
 /** Retourne la liste des presets intégrés. */
 export const listSynthPresets = (): Promise<PresetInfo[]> =>
   invoke<PresetInfo[]>('list_synth_presets');
+
+// ─── Piano Roll / MIDI clips ──────────────────────────────────────────────────
+
+/** Une note MIDI à envoyer au backend (snake_case = serde côté Rust). */
+export interface MidiNoteData {
+  id: number;
+  note: number;           // 0–127 (60 = C4)
+  start_beats: number;    // position relative au début du clip, en beats
+  duration_beats: number; // durée en beats
+  velocity: number;       // 0–127
+}
+
+/** Crée un clip MIDI vide sur la piste instrument. Retourne l'ID du clip. */
+export const addMidiClip = (trackId: number, startBeats: number, lengthBeats: number): Promise<number> =>
+  invoke<number>('add_midi_clip', { trackId, startBeats, lengthBeats });
+
+/** Remplace toutes les notes d'un clip (appelé à chaque modification depuis le piano roll). */
+export const updateMidiClipNotes = (trackId: number, clipId: number, notes: MidiNoteData[]): Promise<void> =>
+  invoke<void>('update_midi_clip_notes', { trackId, clipId, notes });
+
+/** Supprime un clip MIDI. */
+export const deleteMidiClip = (trackId: number, clipId: number): Promise<void> =>
+  invoke<void>('delete_midi_clip', { trackId, clipId });

@@ -1,0 +1,52 @@
+.pianoKeys {
+  flex-shrink: 0;
+  position: relative;
+  background: var(--color-surface-deep, #111);
+  border-right: 2px solid var(--color-border, #333);
+  overflow: hidden;
+}
+
+.key {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border: none;
+  border-bottom: 1px solid var(--color-border, #222);
+  cursor: pointer;
+  transition: background 0.06s;
+  position: relative;
+}
+
+.white {
+  background: #e8e8e8;
+}
+
+.white:hover,
+.white:active {
+  background: #b8b0ff;
+}
+
+.black {
+  background: #2a2a2a;
+  z-index: 1;
+}
+
+.black:hover,
+.black:active {
+  background: #6a3abe;
+}
+
+.label {
+  font-size: 8px;
+  font-weight: 700;
+  color: #555;
+  pointer-events: none;
+  user-select: none;
+}
+
+.black .label {
+  color: #aaa;
+}

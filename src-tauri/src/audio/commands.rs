@@ -103,6 +103,20 @@ pub enum AudioCommand {
 
     /// Charge un preset entier sur la piste instrument donnée.
     LoadSynthPreset { track_id: u32, preset: crate::synth::SynthPreset },
+
+    // ── MIDI clips (piano roll) ───────────────────────────────────────────────
+
+    /// Ajoute (ou remplace) un clip MIDI sur la piste instrument.
+    AddMidiClip { track_id: u32, clip: crate::midi::MidiClip },
+
+    /// Remplace toutes les notes d'un clip MIDI (opération batch depuis le piano roll).
+    UpdateMidiClipNotes { track_id: u32, clip_id: u32, notes: Vec<crate::midi::MidiNote> },
+
+    /// Supprime un clip MIDI d'une piste instrument.
+    DeleteMidiClip { track_id: u32, clip_id: u32 },
+
+    /// Efface tous les clips MIDI d'une piste (nouveau projet, chargement).
+    ClearMidiClips { track_id: u32 },
 }
 
 /// Paramètre de synthé encodé comme enum (pas de String → pas d'allocation/déallocation dans le callback).

@@ -44,6 +44,28 @@
   padding: 1px 5px;
 }
 
+.pianoRollBtn {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--color-surface-deep, #0a0a0a);
+  border: 1px solid #9c27b0;
+  border-radius: 6px;
+  color: #ce93d8;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.pianoRollBtn:hover:not(:disabled) {
+  background: #9c27b0;
+  color: #fff;
+}
+
+.pianoRollBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* ── Contenu 3 colonnes ───────────────────────────────────────────────────── */
 .content {
   display: grid;

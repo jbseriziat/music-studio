@@ -11,6 +11,7 @@ use std::sync::{
 
 use super::commands::AudioCommand;
 use super::config::AudioConfig;
+use crate::midi::MidiClip;
 use crate::synth::SynthEngine;
 use crate::transport::Metronome;
 
@@ -205,6 +206,8 @@ struct AudioCallbackState {
     synth_engines: Vec<SynthEngine>,
     /// Track ID associé à chaque slot (NO_TRACK = libre).
     synth_track_ids: Vec<u32>,
+    /// MIDI clips par slot de synthé (piano roll). Un Vec<MidiClip> par slot.
+    midi_clips: Vec<Vec<MidiClip>>,
 
     // ─── Atomics partagés avec le thread principal ────────────────────────────
     position_atomic: Arc<AtomicU64>,
@@ -236,6 +239,10 @@ impl AudioCallbackState {
                 self.sequencer_counter = 0.0;
                 self.current_step_atomic.store(0, Ordering::Relaxed);
                 self.metronome_voice = None;
+                // Silence les synthés pour éviter les notes coincées des clips MIDI.
+                for eng in &mut self.synth_engines {
+                    eng.reset();
+                }
                 self.is_playing_atomic.store(false, Ordering::Relaxed);
                 self.position_atomic.store(0, Ordering::Relaxed);
             }
@@ -243,6 +250,10 @@ impl AudioCallbackState {
                 self.position_frames = frames;
                 self.clip_voices.clear();
                 self.position_atomic.store(frames, Ordering::Relaxed);
+                // Silence les synthés pour éviter les notes coincées des clips MIDI.
+                for eng in &mut self.synth_engines {
+                    eng.reset();
+                }
             }
             AudioCommand::SetMasterVolume(v) => {
                 self.master_volume = v.clamp(0.0, 1.0);
@@ -305,6 +316,9 @@ impl AudioCallbackState {
                 self.clips.clear();
                 self.clip_voices.clear();
                 self.drum_voices.clear();
+                for clips in &mut self.midi_clips {
+                    clips.clear();
+                }
                 self.sequencer_step = 0;
                 self.sequencer_counter = 0.0;
                 self.current_step_atomic.store(0, Ordering::Relaxed);
@@ -312,6 +326,9 @@ impl AudioCallbackState {
                 self.is_playing = false;
                 self.is_playing_atomic.store(false, Ordering::Relaxed);
                 self.position_atomic.store(0, Ordering::Relaxed);
+                for eng in &mut self.synth_engines {
+                    eng.reset();
+                }
             }
 
             // ── BPM & Drum Sequencer ─────────────────────────────────────────────
@@ -446,6 +463,31 @@ impl AudioCallbackState {
                 // preset (contenant une String) est dropé ici depuis le callback —
                 // cohérent avec SetDrumPattern qui drope des Vec de la même façon.
             }
+
+            // ── MIDI clips (piano roll) ───────────────────────────────────────
+            AudioCommand::AddMidiClip { track_id, clip } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    self.midi_clips[slot].retain(|c| c.id != clip.id);
+                    self.midi_clips[slot].push(clip);
+                }
+            }
+            AudioCommand::UpdateMidiClipNotes { track_id, clip_id, notes } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    if let Some(c) = self.midi_clips[slot].iter_mut().find(|c| c.id == clip_id) {
+                        c.notes = notes; // drops old Vec depuis le callback (acceptable)
+                    }
+                }
+            }
+            AudioCommand::DeleteMidiClip { track_id, clip_id } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    self.midi_clips[slot].retain(|c| c.id != clip_id);
+                }
+            }
+            AudioCommand::ClearMidiClips { track_id } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    self.midi_clips[slot].clear();
+                }
+            }
         }
     }
 }
@@ -570,6 +612,7 @@ impl AudioEngine {
             // Synthétiseur : pré-allouer MAX_SYNTH_TRACKS moteurs.
             synth_engines: (0..MAX_SYNTH_TRACKS).map(|_| SynthEngine::new(sample_rate)).collect(),
             synth_track_ids: vec![NO_TRACK; MAX_SYNTH_TRACKS],
+            midi_clips: vec![Vec::new(); MAX_SYNTH_TRACKS],
             // Atomics
             position_atomic: position_atomic_cb,
             is_playing_atomic: is_playing_atomic_cb,
@@ -628,6 +671,46 @@ impl AudioEngine {
                         right += r;
                         if pv.is_done(&state.samples) {
                             state.preview_voice = None;
+                        }
+                    }
+
+                    // ── MIDI clips (piano roll) — déclenche les notes au bon frame ──
+                    if state.is_playing {
+                        // Approche deux phases pour satisfaire le borrow checker :
+                        // Phase 1 : lecture immutable de midi_clips/synth_track_ids → tableau stack
+                        // Phase 2 : mutation de synth_engines avec les événements collectés
+                        let mut midi_events: [(u8, u8, u8, bool); 64] = [(0, 0, 0, false); 64];
+                        let mut event_count = 0usize;
+                        {
+                            let spb = state.samples_per_step * 4.0; // samples par beat
+                            let pos = state.position_frames;
+                            let track_ids = &state.synth_track_ids;
+                            for (slot, clips) in state.midi_clips.iter().enumerate() {
+                                if track_ids[slot] == NO_TRACK { continue; }
+                                for clip in clips {
+                                    let clip_start = (clip.start_beats * spb) as u64;
+                                    for note in &clip.notes {
+                                        let ns = clip_start + (note.start_beats * spb) as u64;
+                                        let ne = ns + ((note.duration_beats * spb) as u64).max(1);
+                                        if pos == ns && event_count < 64 {
+                                            midi_events[event_count] = (slot as u8, note.note, note.velocity, true);
+                                            event_count += 1;
+                                        }
+                                        if pos == ne && event_count < 64 {
+                                            midi_events[event_count] = (slot as u8, note.note, 0, false);
+                                            event_count += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        } // fin de l'emprunt immutable
+                        for i in 0..event_count {
+                            let (slot, note, velocity, is_on) = midi_events[i];
+                            if is_on {
+                                state.synth_engines[slot as usize].note_on(note, velocity);
+                            } else {
+                                state.synth_engines[slot as usize].note_off(note);
+                            }
                         }
                     }
 
