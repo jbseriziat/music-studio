@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Clip } from './Clip';
 import { DrumClip } from './DrumClip';
+import { MidiClip } from './MidiClip';
 import { addClipCmd, moveClipCmd, setTrackMuteCmd, setTrackSoloCmd } from '../../utils/tauri-commands';
 import { useTracksStore } from '../../stores/tracksStore';
 import styles from './Track.module.css';
@@ -15,6 +16,8 @@ interface TrackClip {
   duration: number;
   color: string;
   waveformData: number[];
+  type?: 'audio' | 'midi';
+  midiClipId?: number;
 }
 
 interface Props {
@@ -34,6 +37,10 @@ interface Props {
   onDeleteTrack: (id: string) => void;
   /** Callback quand l'utilisateur double-clique sur le header (pour ouvrir le drum rack). */
   onDoubleClickHeader?: () => void;
+  /** Callback pour ajouter un clip MIDI à cette piste instrument. */
+  onAddMidiClip?: () => void;
+  /** Callback quand l'utilisateur double-clique sur un clip MIDI (pour ouvrir le piano roll). */
+  onMidiClipDoubleClick?: (midiClipId: number) => void;
 }
 
 function snapToGrid(value: number, grid: number): number {
@@ -42,7 +49,11 @@ function snapToGrid(value: number, grid: number): number {
 
 let clipIdCounter = 100;
 
-export function Track({ id, trackIndex, name, color, muted, solo, trackType, clips, pixelsPerSec, selectedClipId, onSelectClip, onDeleteTrack, onDoubleClickHeader }: Props) {
+export function Track({
+  id, trackIndex, name, color, muted, solo, trackType, clips,
+  pixelsPerSec, selectedClipId, onSelectClip, onDeleteTrack,
+  onDoubleClickHeader, onAddMidiClip, onMidiClipDoubleClick,
+}: Props) {
   const { addClip, moveClip, updateTrack } = useTracksStore();
   const draggingRef = useRef<{ clipId: string; startX: number; startPos: number } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -53,8 +64,8 @@ export function Track({ id, trackIndex, name, color, muted, solo, trackType, cli
     e.preventDefault();
     dragCountRef.current = 0;
     setIsDragOver(false);
-    // Les pistes DrumRack ne reçoivent pas de clips audio.
-    if (trackType === 'drum_rack') return;
+    // Les pistes DrumRack et Instrument ne reçoivent pas de clips audio par drag.
+    if (trackType === 'drum_rack' || trackType === 'instrument') return;
     const rect = e.currentTarget.getBoundingClientRect();
     const rawPos = (e.clientX - rect.left) / pixelsPerSec;
     const position = Math.max(0, snapToGrid(rawPos, SNAP_GRID));
@@ -88,7 +99,7 @@ export function Track({ id, trackIndex, name, color, muted, solo, trackType, cli
     } catch (err) {
       console.error('[Track] drop error', err);
     }
-  }, [id, trackIndex, pixelsPerSec, color, addClip]);
+  }, [id, trackIndex, pixelsPerSec, color, trackType, addClip]);
 
   const handleMute = useCallback(() => {
     const newMuted = !muted;
@@ -153,6 +164,62 @@ export function Track({ id, trackIndex, name, color, muted, solo, trackType, cli
     document.addEventListener('mouseup', onMouseUp);
   }, [id, pixelsPerSec, moveClip]);
 
+  // ── Rendu de la zone de piste selon le type ──────────────────────────────
+
+  const renderLaneContent = () => {
+    if (trackType === 'drum_rack') {
+      return (
+        <DrumClip
+          pixelsPerSec={pixelsPerSec}
+          color={color}
+          onDoubleClick={onDoubleClickHeader}
+        />
+      );
+    }
+
+    if (trackType === 'instrument') {
+      const midiClips = clips.filter(c => c.type === 'midi' && c.midiClipId !== undefined);
+      return (
+        <>
+          {midiClips.map(clip => (
+            <div
+              key={clip.id}
+              style={{ position: 'absolute', left: clip.position * pixelsPerSec }}
+            >
+              <MidiClip
+                midiClipId={clip.midiClipId!}
+                width={clip.duration * pixelsPerSec}
+                color={color}
+                onDoubleClick={() => onMidiClipDoubleClick?.(clip.midiClipId!)}
+              />
+            </div>
+          ))}
+        </>
+      );
+    }
+
+    // Clips audio (piste audio standard).
+    return (
+      <>
+        {clips.map(clip => (
+          <Clip
+            key={clip.id}
+            id={clip.id}
+            sampleName={clip.sampleName ?? clip.sampleId}
+            color={clip.color}
+            positionSecs={clip.position}
+            durationSecs={clip.duration}
+            pixelsPerSec={pixelsPerSec}
+            selected={selectedClipId === clip.id}
+            waveformData={clip.waveformData}
+            onSelect={onSelectClip}
+            onMoveStart={handleClipMoveStart}
+          />
+        ))}
+      </>
+    );
+  };
+
   return (
     <div className={`${styles.track} ${muted ? styles.muted : ''}`}>
       <div
@@ -162,6 +229,18 @@ export function Track({ id, trackIndex, name, color, muted, solo, trackType, cli
         title={onDoubleClickHeader ? 'Double-clic pour éditer' : undefined}
       >
         <span className={styles.name}>{name}</span>
+
+        {/* Bouton "+" pour ajouter un clip MIDI (piste instrument uniquement) */}
+        {trackType === 'instrument' && onAddMidiClip && (
+          <button
+            className={styles.addMidiBtn}
+            onClick={(e) => { e.stopPropagation(); onAddMidiClip(); }}
+            title="Ajouter un clip MIDI"
+            aria-label="Ajouter un clip MIDI"
+          >
+            +
+          </button>
+        )}
 
         {/* ─── Boutons Mute / Solo ──────────────────────────────────── */}
         <button
@@ -193,35 +272,16 @@ export function Track({ id, trackIndex, name, color, muted, solo, trackType, cli
         </button>
       </div>
       <div
-        className={`${styles.lane} ${isDragOver && trackType !== 'drum_rack' ? styles.dragOver : ''}`}
+        className={`${styles.lane} ${
+          isDragOver && trackType !== 'drum_rack' && trackType !== 'instrument'
+            ? styles.dragOver : ''
+        }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
       >
-        {trackType === 'drum_rack' ? (
-          <DrumClip
-            pixelsPerSec={pixelsPerSec}
-            color={color}
-            onDoubleClick={onDoubleClickHeader}
-          />
-        ) : (
-          clips.map(clip => (
-            <Clip
-              key={clip.id}
-              id={clip.id}
-              sampleName={clip.sampleName ?? clip.sampleId}
-              color={clip.color}
-              positionSecs={clip.position}
-              durationSecs={clip.duration}
-              pixelsPerSec={pixelsPerSec}
-              selected={selectedClipId === clip.id}
-              waveformData={clip.waveformData}
-              onSelect={onSelectClip}
-              onMoveStart={handleClipMoveStart}
-            />
-          ))
-        )}
+        {renderLaneContent()}
       </div>
     </div>
   );

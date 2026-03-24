@@ -13,6 +13,9 @@ pub struct MspProject {
     /// Pattern du drum rack (None si pas encore créé / niveau 1).
     #[serde(default)]
     pub drum_pattern: Option<ProjectDrumPattern>,
+    /// Pistes instrument avec clips MIDI (Phase 3, absent dans les anciens projets).
+    #[serde(default)]
+    pub instrument_tracks: Option<Vec<ProjectInstrumentTrack>>,
 }
 
 impl MspProject {
@@ -26,6 +29,7 @@ impl MspProject {
             tracks: Vec::new(),
             pads: Self::default_pads(),
             drum_pattern: None,
+            instrument_tracks: None,
         }
     }
 
@@ -77,6 +81,43 @@ pub struct ProjectClip {
 pub struct ProjectPad {
     pub id: u8,
     pub sample_id: Option<u32>,
+}
+
+// ─── Structures pour les pistes instrument (Phase 3) ─────────────────────────
+
+/// Snapshot d'une piste instrument (synthé + clips MIDI).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectInstrumentTrack {
+    /// ID frontend de la piste (UUID dans tracksStore).
+    pub frontend_track_id: String,
+    /// Nom du preset synthé actif (None si preset personnalisé ou aucun).
+    #[serde(default)]
+    pub preset_name: Option<String>,
+    /// Clips MIDI de la piste.
+    pub midi_clips: Vec<ProjectMidiClipData>,
+}
+
+/// Snapshot d'un clip MIDI.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectMidiClipData {
+    /// ID frontend du clip (ex: "midi-clip-42").
+    pub frontend_clip_id: String,
+    /// Position du clip en beats dans la timeline.
+    pub start_beats: f64,
+    /// Longueur du clip en beats.
+    pub length_beats: f64,
+    /// Notes MIDI du clip.
+    pub notes: Vec<ProjectMidiNote>,
+}
+
+/// Une note MIDI sérialisée.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectMidiNote {
+    pub id: u32,
+    pub note: u8,
+    pub start_beats: f64,
+    pub duration_beats: f64,
+    pub velocity: u8,
 }
 
 /// Sauvegarde un projet dans un fichier .msp.

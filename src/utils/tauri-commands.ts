@@ -38,6 +38,32 @@ export interface MspProject {
   pads: ProjectPad[];
   /** Pattern du drum rack, absent dans les anciens projets. */
   drum_pattern?: DrumPatternDto;
+  /** Pistes instrument avec clips MIDI (Phase 3, absent dans les anciens projets). */
+  instrument_tracks?: ProjectInstrumentTrack[];
+}
+
+/** Snapshot d'une piste instrument (synthé + clips MIDI). */
+export interface ProjectInstrumentTrack {
+  frontend_track_id: string;
+  preset_name?: string;
+  midi_clips: ProjectMidiClipData[];
+}
+
+/** Snapshot d'un clip MIDI. */
+export interface ProjectMidiClipData {
+  frontend_clip_id: string;
+  start_beats: number;
+  length_beats: number;
+  notes: ProjectMidiNote[];
+}
+
+/** Une note MIDI sérialisée. */
+export interface ProjectMidiNote {
+  id: number;
+  note: number;
+  start_beats: number;
+  duration_beats: number;
+  velocity: number;
 }
 
 export interface ProjectTrack {

@@ -38,13 +38,23 @@ interface PianoRollState {
   quantize: Quantize;
   /** Compteur local pour générer les IDs de notes. */
   _nextNoteId: number;
+  /** Notes stockées par clipId Rust (pour gérer plusieurs clips). */
+  perClipNotes: Record<number, PianoRollNote[]>;
+  /** Notes copiées dans le presse-papier (Ctrl+C). */
+  copiedNotes: PianoRollNote[];
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
   /** Ouvre le piano roll pour une piste synthé. Crée le clip Rust si nécessaire. */
   openForTrack: (trackId: number) => Promise<void>;
 
-  /** Ferme le piano roll (conserve les données). */
+  /**
+   * Ouvre le piano roll pour un clip MIDI existant (identifié par son ID Rust).
+   * Sauvegarde les notes du clip actuel avant de changer de clip.
+   */
+  openForClip: (trackId: number, clipId: number) => void;
+
+  /** Ferme le piano roll (conserve les données dans perClipNotes). */
   close: () => void;
 
   /** Ajoute une note et synchronise avec le backend. */
@@ -68,6 +78,21 @@ interface PianoRollState {
   /** Joue une note en aperçu (note_on sans transport). */
   previewNoteOn: (note: number) => void;
   previewNoteOff: (note: number) => void;
+
+  /** Sélectionne toutes les notes (Ctrl+A). */
+  selectAll: () => void;
+
+  /** Copie les notes sélectionnées dans le presse-papier (Ctrl+C). */
+  copySelectedNotes: () => void;
+
+  /** Colle les notes copiées, légèrement décalées (Ctrl+V). */
+  pasteNotes: () => void;
+
+  /**
+   * Restaure les notes par clipId depuis un projet chargé.
+   * Utilisé par projectStore lors de l'ouverture d'un projet.
+   */
+  restoreClipNotes: (allNotes: Record<number, PianoRollNote[]>, nextId: number) => void;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -83,6 +108,12 @@ function toMidiNoteData(notes: PianoRollNote[]): MidiNoteData[] {
   }));
 }
 
+/** Synchronise les notes avec le backend pour un clip donné. */
+function syncNotes(trackId: number | null, clipId: number | null, notes: PianoRollNote[]) {
+  if (trackId === null || clipId === null) return;
+  updateMidiClipNotes(trackId, clipId, toMidiNoteData(notes)).catch(console.error);
+}
+
 // ─── Store ─────────────────────────────────────────────────────────────────────
 
 export const usePianoRollStore = create<PianoRollState>((set, get) => ({
@@ -93,24 +124,68 @@ export const usePianoRollStore = create<PianoRollState>((set, get) => ({
   selectedNoteIds: new Set(),
   quantize: 0.125, // 1/8 par défaut
   _nextNoteId: 1,
+  perClipNotes: {},
+  copiedNotes: [],
 
   openForTrack: async (trackId) => {
     const { clipId } = get();
-    // Si aucun clip n'existe encore, en créer un depuis le beat 0 sur 4 beats.
-    let activeClipId = clipId;
-    if (activeClipId === null) {
-      try {
-        activeClipId = await addMidiClip(trackId, 0, 4);
-      } catch (err) {
-        console.error('[pianoRollStore] addMidiClip failed:', err);
-        return;
-      }
+
+    // Si un clip existe déjà (créé lors d'une session précédente), rouvrir.
+    if (clipId !== null) {
+      const existingNotes = get().perClipNotes[clipId] ?? get().notes;
+      set({ isOpen: true, trackId, notes: existingNotes });
+      return;
     }
-    set({ isOpen: true, trackId, clipId: activeClipId });
+
+    // Sinon créer un nouveau clip Rust.
+    try {
+      const newClipId = await addMidiClip(trackId, 0, 4);
+      set((s) => ({
+        isOpen: true,
+        trackId,
+        clipId: newClipId,
+        notes: [],
+        perClipNotes: { ...s.perClipNotes, [newClipId]: [] },
+      }));
+    } catch (err) {
+      console.error('[pianoRollStore] addMidiClip failed:', err);
+    }
+  },
+
+  openForClip: (trackId, clipId) => {
+    const { clipId: currentClipId, notes: currentNotes, perClipNotes } = get();
+
+    // Sauvegarder les notes actuelles dans perClipNotes avant de changer de clip.
+    const updatedPerClip: Record<number, PianoRollNote[]> = { ...perClipNotes };
+    if (currentClipId !== null) {
+      updatedPerClip[currentClipId] = currentNotes;
+    }
+
+    // Charger les notes du nouveau clip (ou [] si jamais édité).
+    const newNotes = updatedPerClip[clipId] ?? [];
+    updatedPerClip[clipId] = newNotes;
+
+    set({
+      isOpen: true,
+      trackId,
+      clipId,
+      notes: newNotes,
+      selectedNoteIds: new Set(),
+      perClipNotes: updatedPerClip,
+    });
   },
 
   close: () => {
-    set({ isOpen: false });
+    const { clipId, notes } = get();
+    // Sauvegarder les notes dans perClipNotes avant de fermer.
+    if (clipId !== null) {
+      set((s) => ({
+        isOpen: false,
+        perClipNotes: { ...s.perClipNotes, [clipId]: notes },
+      }));
+    } else {
+      set({ isOpen: false });
+    }
   },
 
   addNote: (note, startBeats, durationBeats, velocity) => {
@@ -124,16 +199,23 @@ export const usePianoRollStore = create<PianoRollState>((set, get) => ({
       velocity,
     };
     const notes = [...get().notes, newNote];
-    set({ notes, _nextNoteId: _nextNoteId + 1 });
-    updateMidiClipNotes(trackId, clipId, toMidiNoteData(notes)).catch(console.error);
+    set((s) => ({
+      notes,
+      _nextNoteId: s._nextNoteId + 1,
+      perClipNotes: { ...s.perClipNotes, [clipId]: notes },
+    }));
+    syncNotes(trackId, clipId, notes);
   },
 
   updateNote: (id, patch) => {
     const { trackId, clipId } = get();
     if (trackId === null || clipId === null) return;
     const notes = get().notes.map(n => n.id === id ? { ...n, ...patch } : n);
-    set({ notes });
-    updateMidiClipNotes(trackId, clipId, toMidiNoteData(notes)).catch(console.error);
+    set((s) => ({
+      notes,
+      perClipNotes: { ...s.perClipNotes, [clipId]: notes },
+    }));
+    syncNotes(trackId, clipId, notes);
   },
 
   deleteNotes: (ids) => {
@@ -142,8 +224,12 @@ export const usePianoRollStore = create<PianoRollState>((set, get) => ({
     const idSet = new Set(ids);
     const notes = get().notes.filter(n => !idSet.has(n.id));
     const selectedNoteIds = new Set([...get().selectedNoteIds].filter(id => !idSet.has(id)));
-    set({ notes, selectedNoteIds });
-    updateMidiClipNotes(trackId, clipId, toMidiNoteData(notes)).catch(console.error);
+    set((s) => ({
+      notes,
+      selectedNoteIds,
+      perClipNotes: { ...s.perClipNotes, [clipId]: notes },
+    }));
+    syncNotes(trackId, clipId, notes);
   },
 
   setSelection: (ids) => {
@@ -170,5 +256,44 @@ export const usePianoRollStore = create<PianoRollState>((set, get) => ({
     const { trackId } = get();
     if (trackId === null) return;
     noteOffCmd(trackId, note).catch(console.error);
+  },
+
+  selectAll: () => {
+    const { notes } = get();
+    set({ selectedNoteIds: new Set(notes.map(n => n.id)) });
+  },
+
+  copySelectedNotes: () => {
+    const { notes, selectedNoteIds } = get();
+    if (selectedNoteIds.size === 0) return;
+    const selected = notes.filter(n => selectedNoteIds.has(n.id));
+    set({ copiedNotes: selected });
+  },
+
+  pasteNotes: () => {
+    const { copiedNotes, trackId, clipId, _nextNoteId } = get();
+    if (copiedNotes.length === 0 || trackId === null || clipId === null) return;
+
+    // Décaler les notes collées d'un quart de beat vers la droite.
+    const offset = 0.25;
+    let nextId = _nextNoteId;
+    const pasted: PianoRollNote[] = copiedNotes.map(n => ({
+      ...n,
+      id: nextId++,
+      startBeats: n.startBeats + offset,
+    }));
+
+    const notes = [...get().notes, ...pasted];
+    set((s) => ({
+      notes,
+      _nextNoteId: nextId,
+      selectedNoteIds: new Set(pasted.map(n => n.id)),
+      perClipNotes: { ...s.perClipNotes, [clipId]: notes },
+    }));
+    syncNotes(trackId, clipId, notes);
+  },
+
+  restoreClipNotes: (allNotes, nextId) => {
+    set({ perClipNotes: allNotes, _nextNoteId: nextId });
   },
 }));

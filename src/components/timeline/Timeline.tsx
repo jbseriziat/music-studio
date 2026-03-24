@@ -6,7 +6,10 @@ import { AddTrackButton } from './AddTrackButton';
 import { useTracksStore } from '../../stores/tracksStore';
 import { useTransportStore } from '../../stores/transportStore';
 import { useFeatureLevel } from '../../hooks/useFeatureLevel';
-import { deleteClipCmd } from '../../utils/tauri-commands';
+import { useSynthStore } from '../../stores/synthStore';
+import { usePianoRollStore } from '../../stores/pianoRollStore';
+import { deleteClipCmd, addMidiClip } from '../../utils/tauri-commands';
+import type { Clip } from '../../types/audio';
 import styles from './Timeline.module.css';
 
 const DEFAULT_PIXELS_PER_SEC = 100;
@@ -25,7 +28,7 @@ let trackIdCounter = 0;
 const TRACK_COLORS = ['#FF5722', '#2196F3', '#4CAF50', '#9C27B0', '#FF9800', '#00BCD4'];
 
 export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
-  const { tracks, clips, selectedClipId, addTrack, removeTrack, selectClip } = useTracksStore();
+  const { tracks, clips, selectedClipId, addTrack, removeTrack, addClip, selectClip } = useTracksStore();
   const { currentLevel } = useFeatureLevel();
   const bpm         = useTransportStore((s) => s.bpm);
   const loopEnabled = useTransportStore((s) => s.loopEnabled);
@@ -83,6 +86,16 @@ export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
     }
   }, [currentLevel, hasDrumTrack, addTrack]);
 
+  // Auto-ajout de la piste Instrument (Synthé) au niveau 3+.
+  const hasInstrumentTrack = tracks.some((t) => t.type === 'instrument');
+  useEffect(() => {
+    if (currentLevel >= 3 && !hasInstrumentTrack) {
+      addTrack('Synthé', 'instrument', '#9C27B0');
+      // Initialiser le moteur synthé dès que la piste est créée.
+      useSynthStore.getState().init().catch(console.error);
+    }
+  }, [currentLevel, hasInstrumentTrack, addTrack]);
+
   // Touche Suppr pour effacer le clip sélectionné (frontend + moteur audio).
   useEffect(() => {
     const handler = async (e: KeyboardEvent) => {
@@ -108,6 +121,52 @@ export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
     const color = TRACK_COLORS[n % TRACK_COLORS.length];
     addTrack(`Piste ${++trackIdCounter}`, 'audio', color);
   }, [tracks.length, addTrack]);
+
+  // ── Gestion des clips MIDI ─────────────────────────────────────────────────
+
+  /** Crée un nouveau clip MIDI vide (4 beats à la position 0) sur la piste instrument. */
+  const handleAddMidiClip = useCallback(async (frontendTrackId: string, trackColor: string) => {
+    let rustTrackId = useSynthStore.getState().trackId;
+    if (rustTrackId === null) {
+      await useSynthStore.getState().init();
+      rustTrackId = useSynthStore.getState().trackId;
+    }
+    if (rustTrackId === null) return;
+
+    try {
+      const defaultLengthBeats = 4;
+      const rustClipId = await addMidiClip(rustTrackId, 0, defaultLengthBeats);
+      const durationSecs = defaultLengthBeats * (60 / bpm);
+
+      const newClip: Clip = {
+        id: `midi-clip-${rustClipId}`,
+        trackId: frontendTrackId,
+        sampleId: '',
+        position: 0,
+        duration: durationSecs,
+        color: trackColor,
+        waveformData: [],
+        type: 'midi',
+        midiClipId: rustClipId,
+        startBeats: 0,
+        lengthBeats: defaultLengthBeats,
+      };
+
+      addClip(newClip);
+
+      // Ouvrir le piano roll pour ce nouveau clip.
+      usePianoRollStore.getState().openForClip(rustTrackId, rustClipId);
+    } catch (err) {
+      console.error('[Timeline] handleAddMidiClip error:', err);
+    }
+  }, [bpm, addClip]);
+
+  /** Ouvre le piano roll pour un clip MIDI existant (double-clic). */
+  const handleMidiClipDoubleClick = useCallback((midiClipId: number) => {
+    const rustTrackId = useSynthStore.getState().trackId;
+    if (rustTrackId === null) return;
+    usePianoRollStore.getState().openForClip(rustTrackId, midiClipId);
+  }, []);
 
   const maxTracks = currentLevel >= 2 ? Infinity : MAX_TRACKS_LEVEL1;
   const canAddTrack = tracks.length < maxTracks;
@@ -165,6 +224,8 @@ export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
                     duration: c.duration,
                     color: c.color,
                     waveformData: c.waveformData,
+                    type: c.type,
+                    midiClipId: c.midiClipId,
                   }))}
                 trackType={track.type}
                 pixelsPerSec={pixelsPerSec}
@@ -173,6 +234,14 @@ export function Timeline({ positionSecs, onDrumTrackDoubleClick }: Props) {
                 onDeleteTrack={removeTrack}
                 onDoubleClickHeader={
                   track.type === 'drum_rack' ? onDrumTrackDoubleClick : undefined
+                }
+                onAddMidiClip={
+                  track.type === 'instrument'
+                    ? () => handleAddMidiClip(track.id, track.color)
+                    : undefined
+                }
+                onMidiClipDoubleClick={
+                  track.type === 'instrument' ? handleMidiClipDoubleClick : undefined
                 }
               />
             ))}

@@ -43,6 +43,12 @@ export function PianoRoll() {
       <div className={styles.panel}>
         {/* ── En-tête ──────────────────────────────────────────────────────── */}
         <div className={styles.header}>
+          <button
+            className={styles.backBtn}
+            onClick={close}
+            aria-label="Retour à la timeline"
+            title="Retour à la timeline (Échap)"
+          >← Timeline</button>
           <span className={styles.icon}>🎹</span>
           <h3 className={styles.title}>Piano Roll</h3>
           {trackId !== null && (

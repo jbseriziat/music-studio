@@ -29,16 +29,24 @@ export interface Track {
   solo: boolean;
 }
 
-// Clip audio sur la timeline (Phase 1)
+// Clip audio sur la timeline (Phase 1) ou MIDI (Phase 3)
 export interface Clip {
   id: string;
   trackId: string;
   sampleId: string;
   sampleName?: string;   // Nom affiché dans le clip
-  position: number;     // en secondes (niveau 1) ou en beats (niveaux +)
-  duration: number;
+  position: number;     // en secondes (audio) ou secondes converties depuis beats (MIDI)
+  duration: number;     // en secondes
   color: string;
   waveformData: number[];
+  /** Type du clip : 'audio' (défaut) ou 'midi'. */
+  type?: 'audio' | 'midi';
+  /** ID du clip MIDI côté Rust (utilisé pour le piano roll). Défini si type === 'midi'. */
+  midiClipId?: number;
+  /** Position en beats (pour les clips MIDI, stockée pour la sauvegarde). */
+  startBeats?: number;
+  /** Durée en beats (pour les clips MIDI, stockée pour la sauvegarde). */
+  lengthBeats?: number;
 }
 
 // Pattern de séquenceur pas-à-pas (Phase 2)

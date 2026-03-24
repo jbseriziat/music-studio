@@ -314,9 +314,31 @@ export function NoteGrid() {
   }, [findNoteAt, deleteNotes]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const store = usePianoRollStore.getState();
+
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      const { deleteSelectedNotes } = usePianoRollStore.getState();
-      deleteSelectedNotes();
+      store.deleteSelectedNotes();
+      e.preventDefault();
+      return;
+    }
+
+    if (e.ctrlKey || e.metaKey) {
+      switch (e.key.toLowerCase()) {
+        case 'a':
+          store.selectAll();
+          e.preventDefault();
+          break;
+        case 'c':
+          store.copySelectedNotes();
+          e.preventDefault();
+          break;
+        case 'v':
+          store.pasteNotes();
+          e.preventDefault();
+          break;
+        default:
+          break;
+      }
     }
   }, []);
 

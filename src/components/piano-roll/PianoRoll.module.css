@@ -55,6 +55,29 @@
   flex: 1;
 }
 
+/* Bouton "← Timeline" pour revenir depuis le piano roll */
+.backBtn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border, #444);
+  border-radius: 6px;
+  background: var(--color-surface-deep, #111);
+  color: var(--color-text-muted, #aaa);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+
+.backBtn:hover {
+  background: var(--color-surface-elevated, #222);
+  color: var(--color-text, #eee);
+  border-color: var(--color-accent, #9c27b0);
+}
+
 .closeBtn {
   width: 28px;
   height: 28px;

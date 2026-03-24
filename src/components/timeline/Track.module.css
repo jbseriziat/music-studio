@@ -70,6 +70,31 @@
   color: #FFD740;
 }
 
+/* Bouton "+" pour ajouter un clip MIDI sur une piste instrument */
+.addMidiBtn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid rgba(156, 39, 176, 0.5);
+  background: rgba(156, 39, 176, 0.12);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ce93d8;
+  transition: background 0.1s, border-color 0.1s;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.addMidiBtn:hover {
+  background: rgba(156, 39, 176, 0.3);
+  border-color: #9c27b0;
+  color: #e040fb;
+}
+
 .deleteBtn {
   width: 22px;
   height: 22px;
