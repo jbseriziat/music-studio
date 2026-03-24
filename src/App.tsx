@@ -10,10 +10,11 @@ import { ProjectBrowser } from './components/layout/ProjectBrowser';
 import { SampleBrowser } from './components/sample-browser/SampleBrowser';
 import { SoundPadGrid } from './components/sound-pad/SoundPadGrid';
 import { DrumRack } from './components/drum-rack/DrumRack';
+import { SynthPanel } from './components/synth/SynthPanel';
 import { Timeline } from './components/timeline/Timeline';
 import styles from './App.module.css';
 
-type InstrumentTab = 'pads' | 'drums';
+type InstrumentTab = 'pads' | 'drums' | 'synth';
 
 function App() {
   const activeProfileId = useSettingsStore((s) => s.activeProfileId);
@@ -46,14 +47,14 @@ function App() {
       >
         <div className={styles.mainLayout}>
           <section className={styles.padsSection}>
-            {/* Onglets : Pads | Drum Rack (Niveau 2+) */}
+            {/* Onglets : Pads | Drum Rack (Niveau 2+) | Synthé (Niveau 3+) */}
             {isVisible(2) && (
               <div className={styles.tabBar}>
                 <button
                   className={`${styles.tab} ${activeTab === 'pads' ? styles.tabActive : ''}`}
                   onClick={() => setActiveTab('pads')}
                 >
-                  🎹 Pads
+                  🎵 Pads
                 </button>
                 <button
                   className={`${styles.tab} ${activeTab === 'drums' ? styles.tabActive : ''}`}
@@ -61,12 +62,21 @@ function App() {
                 >
                   🥁 Drum Rack
                 </button>
+                {isVisible(3) && (
+                  <button
+                    className={`${styles.tab} ${activeTab === 'synth' ? styles.tabActive : ''}`}
+                    onClick={() => setActiveTab('synth')}
+                  >
+                    🎹 Synthé
+                  </button>
+                )}
               </div>
             )}
 
             {/* Contenu selon l'onglet actif */}
             {activeTab === 'pads' && <SoundPadGrid />}
             {activeTab === 'drums' && isVisible(2) && <DrumRack />}
+            {activeTab === 'synth' && isVisible(3) && <SynthPanel />}
           </section>
           <section className={styles.timelineSection}>
             <Timeline

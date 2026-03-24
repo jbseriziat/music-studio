@@ -1,0 +1,134 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: var(--color-surface, #1a1a1a);
+  border-radius: 12px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+/* ── En-tête ──────────────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon {
+  font-size: 20px;
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.trackBadge {
+  font-size: 10px;
+  color: var(--color-text-muted, #777);
+  background: var(--color-surface-deep, #0a0a0a);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* ── Contenu 3 colonnes ───────────────────────────────────────────────────── */
+.content {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--color-surface-deep, #0a0a0a);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.volumeRow {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+/* ── Clavier virtuel ──────────────────────────────────────────────────────── */
+.keyboard {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+  height: 80px;
+  background: var(--color-surface-deep, #0a0a0a);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 4px;
+  gap: 1px;
+}
+
+.key {
+  border: 1px solid var(--color-border, #333);
+  border-radius: 0 0 4px 4px;
+  cursor: pointer;
+  transition: background 0.08s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.whiteKey {
+  background: #f0f0f0;
+  height: 72px;
+  width: calc(100% / 17); /* 17 touches blanches sur 2 octaves */
+  min-width: 20px;
+}
+
+.whiteKey:hover,
+.whiteKey:active {
+  background: #d0d0ff;
+}
+
+.blackKey {
+  background: #1a1a1a;
+  height: 44px;
+  width: calc(100% / 28); /* plus étroit */
+  min-width: 14px;
+  margin: 0 -7px;
+  z-index: 1;
+  position: relative;
+}
+
+.blackKey:hover,
+.blackKey:active {
+  background: #5b3d9c;
+}
+
+/* ── Aide clavier ─────────────────────────────────────────────────────────── */
+.keyboardHint {
+  margin: 0;
+  font-size: 10px;
+  color: var(--color-text-muted, #666);
+  text-align: center;
+}
+
+/* ── Chargement ───────────────────────────────────────────────────────────── */
+.loading {
+  padding: 32px;
+  text-align: center;
+  color: var(--color-text-muted, #777);
+  font-style: italic;
+}

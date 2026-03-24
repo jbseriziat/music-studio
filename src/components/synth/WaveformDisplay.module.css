@@ -1,0 +1,7 @@
+.display {
+  display: block;
+  background: var(--color-surface-deep, #0a0a0a);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}

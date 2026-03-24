@@ -258,3 +258,44 @@ export const loadDrumKitCmd = (kitName: string): Promise<DrumPadConfigDto[]> =>
 /** Retourne la liste des kits intégrés. */
 export const listDrumKits = (): Promise<DrumKitInfo[]> =>
   invoke<DrumKitInfo[]>('list_drum_kits');
+
+// ─── Synthétiseur ─────────────────────────────────────────────────────────────
+
+export interface PresetInfo {
+  name: string;
+  waveform: string;
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+  cutoff: number;
+  resonance: number;
+}
+
+/** Crée une piste instrument avec synthé. Retourne le trackId Rust (≥ 100). */
+export const createSynthTrack = (name: string): Promise<number> =>
+  invoke<number>('create_synth_track', { name });
+
+/** Déclenche une note (note_on) sur la piste synthé. velocity ∈ [0, 127]. */
+export const noteOnCmd = (trackId: number, note: number, velocity: number): Promise<void> =>
+  invoke<void>('note_on', { trackId, note, velocity });
+
+/** Relâche une note (note_off) sur la piste synthé. */
+export const noteOffCmd = (trackId: number, note: number): Promise<void> =>
+  invoke<void>('note_off', { trackId, note });
+
+/**
+ * Modifie un paramètre du synthé.
+ * param : "waveform" | "attack" | "decay" | "sustain" | "release" |
+ *         "cutoff" | "resonance" | "octave" | "detune" | "volume"
+ */
+export const setSynthParam = (trackId: number, param: string, value: number): Promise<void> =>
+  invoke<void>('set_synth_param', { trackId, param, value });
+
+/** Charge un preset intégré par nom. */
+export const loadSynthPresetCmd = (trackId: number, presetName: string): Promise<void> =>
+  invoke<void>('load_synth_preset', { trackId, presetName });
+
+/** Retourne la liste des presets intégrés. */
+export const listSynthPresets = (): Promise<PresetInfo[]> =>
+  invoke<PresetInfo[]>('list_synth_presets');

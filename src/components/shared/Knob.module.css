@@ -1,0 +1,40 @@
+.knobContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  user-select: none;
+}
+
+.knobSvg {
+  display: block;
+  transition: filter 0.15s ease;
+}
+
+.knobSvg:hover {
+  filter: brightness(1.15);
+}
+
+.knobSvg:active {
+  filter: brightness(1.3);
+}
+
+.knobValue {
+  font-size: 10px;
+  color: var(--color-text-muted, #aaa);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  min-width: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knobLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #ccc);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
