@@ -12,15 +12,31 @@ export const LINEAR_TO_DB = (v: number): number =>
 export const DB_TO_LINEAR = (db: number): number =>
   db === -Infinity ? 0 : Math.pow(10, db / 20);
 
+export interface MasteringData {
+  lufsMomentary: number;
+  lufsShortterm: number;
+  lufsIntegrated: number;
+  truePeakDb: number;
+  limiterGrDb: number;
+  spectrum: number[];
+}
+
+const ZERO_MASTERING: MasteringData = {
+  lufsMomentary: -70, lufsShortterm: -70, lufsIntegrated: -70,
+  truePeakDb: -70, limiterGrDb: 0, spectrum: [],
+};
+
 interface MixerState {
-  masterVolume: number;      // 0.0 – 1.0
-  masterVolumeDb: number;    // en dB
+  masterVolume: number;
+  masterVolumeDb: number;
   masterMeter: MeterData;
-  meters: Record<string, MeterData>;  // trackId → niveaux
+  meters: Record<string, MeterData>;
+  masteringData: MasteringData;
   // Actions
   setMasterVolume: (volume: number) => void;
   updateMeter: (trackId: string, data: MeterData) => void;
   updateMasterMeter: (data: MeterData) => void;
+  updateMasteringData: (data: MasteringData) => void;
   resetMeters: () => void;
 }
 
@@ -31,6 +47,7 @@ export const useMixerStore = create<MixerState>()((set) => ({
   masterVolumeDb: 0,
   masterMeter: ZERO_METER,
   meters: {},
+  masteringData: ZERO_MASTERING,
 
   setMasterVolume: (volume) =>
     set({ masterVolume: volume, masterVolumeDb: LINEAR_TO_DB(volume) }),
@@ -40,5 +57,7 @@ export const useMixerStore = create<MixerState>()((set) => ({
 
   updateMasterMeter: (data) => set({ masterMeter: data }),
 
-  resetMeters: () => set({ meters: {}, masterMeter: ZERO_METER }),
+  updateMasteringData: (data) => set({ masteringData: data }),
+
+  resetMeters: () => set({ meters: {}, masterMeter: ZERO_METER, masteringData: ZERO_MASTERING }),
 }));

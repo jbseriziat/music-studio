@@ -84,6 +84,20 @@ impl EffectChain {
     pub fn is_empty(&self) -> bool {
         self.slots.is_empty()
     }
+
+    /// Injecte les niveaux pré-effet de toutes les pistes dans les compresseurs
+    /// qui ont un sidechain actif. Phase 5.5.
+    pub fn inject_sidechain_levels(&mut self, pre_fx_peaks: &[f32; 64]) {
+        for slot in &mut self.slots {
+            if slot.effect.effect_type() == "compressor" {
+                let sc_source = slot.effect.get_param("sidechain");
+                if sc_source >= 0.0 {
+                    let src_tidx = (sc_source as u32 % 64) as usize;
+                    slot.effect.set_param("_sidechain_level", pre_fx_peaks[src_tidx]);
+                }
+            }
+        }
+    }
 }
 
 impl Default for EffectChain {

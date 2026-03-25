@@ -36,3 +36,32 @@
   min-width: 70px;
   text-align: center;
 }
+
+/* ── Phase 5.2 : filter type selector ────────────────────────────────────── */
+.filterTypeRow {
+  display: flex;
+  gap: 3px;
+}
+
+.filterTypeBtn {
+  flex: 1;
+  padding: 3px 2px;
+  font-size: 9px;
+  font-weight: 700;
+  background: var(--color-surface, #1a1a1a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 3px;
+  color: var(--color-text-secondary, #aaa);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.filterTypeBtn:hover {
+  border-color: var(--color-accent-dim, #555);
+}
+
+.filterTypeActive {
+  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  border-color: var(--color-accent, #9C27B0);
+  color: var(--color-accent, #9C27B0);
+}

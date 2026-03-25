@@ -3,12 +3,18 @@ import styles from './OscillatorUI.module.css';
 import { WaveformDisplay } from './WaveformDisplay';
 import { Knob } from '../shared/Knob';
 import { useSynthStore, type Waveform } from '../../stores/synthStore';
+import { useFeatureLevel } from '../../hooks/useFeatureLevel';
 
-const WAVEFORMS: { id: Waveform; label: string; symbol: string }[] = [
+const WAVEFORMS_BASE: { id: Waveform; label: string; symbol: string }[] = [
   { id: 'sine',     label: 'Sinus',     symbol: '∿' },
   { id: 'square',   label: 'Carré',     symbol: '⊓' },
   { id: 'sawtooth', label: 'Dent scie', symbol: '⩘' },
   { id: 'triangle', label: 'Triangle',  symbol: '△' },
+];
+
+const WAVEFORMS_PRO: { id: Waveform; label: string; symbol: string }[] = [
+  { id: 'noise',      label: 'Bruit',  symbol: '〰' },
+  { id: 'pulsewidth', label: 'PWM',    symbol: '⊔' },
 ];
 
 /**
@@ -20,6 +26,8 @@ const WAVEFORMS: { id: Waveform; label: string; symbol: string }[] = [
  */
 export function OscillatorUI() {
   const { params, setParam } = useSynthStore();
+  const { isVisible } = useFeatureLevel();
+  const WAVEFORMS = isVisible(5) ? [...WAVEFORMS_BASE, ...WAVEFORMS_PRO] : WAVEFORMS_BASE;
 
   const handleWaveform = useCallback((wf: Waveform) => {
     setParam('waveform', wf);

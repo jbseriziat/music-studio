@@ -180,6 +180,68 @@ pub enum AudioCommand {
     /// Arrête la capture synthé : le callback drop son `HeapProd`, ce qui
     /// ferme le ring buffer côté producteur.
     ClearSynthRecord,
+
+    // ── Matrice de modulation (Phase 5.2) ────────────────────────────────────
+
+    /// Ajoute un routage de modulation au synthé d'une piste.
+    AddModRoute {
+        track_id: u32,
+        route_id: u32,
+        source: u32,      // ModSource index
+        destination: u32,  // ModDestination index
+        amount: f32,
+    },
+
+    /// Met à jour l'intensité d'un routage existant.
+    UpdateModRoute { track_id: u32, route_id: u32, amount: f32 },
+
+    /// Supprime un routage de modulation.
+    RemoveModRoute { track_id: u32, route_id: u32 },
+
+    // ── Master Chain (Phase 5.3) ─────────────────────────────────────────────
+
+    /// Active/désactive la chaîne de mastering.
+    SetMasterChainEnabled { enabled: bool },
+
+    /// Règle une bande de l'EQ master (0–4).
+    SetMasterEqBand { band: u8, gain_db: f32, freq: f32, q: f32 },
+
+    /// Règle le threshold du limiteur (en dB, -12 à 0).
+    SetLimiterThreshold { threshold_db: f32 },
+
+    /// Active/désactive le limiteur.
+    SetLimiterEnabled { enabled: bool },
+
+    /// Reset le LUFS meter (nouveau morceau / repositionnement).
+    ResetLufs,
+
+    // ── Bus d'effets Send/Return (Phase 5.4) ─────────────────────────────────
+
+    /// Crée un bus d'effets.
+    CreateBus { bus_id: u32, name: String },
+
+    /// Supprime un bus d'effets.
+    DeleteBus { bus_id: u32 },
+
+    /// Ajoute un effet à un bus (même système que les effets de piste).
+    AddBusEffect { bus_id: u32, effect_id: u32, effect: crate::effects::BoxedEffect },
+
+    /// Règle le volume d'un bus.
+    SetBusVolume { bus_id: u32, volume: f32 },
+
+    /// Règle le send amount d'une piste vers un bus.
+    SetSendAmount { track_id: u32, bus_id: u32, amount: f32 },
+
+    // ── Track Groups (Phase 5.5) ─────────────────────────────────────────────
+
+    /// Crée un groupe de pistes.
+    CreateTrackGroup { group_id: u32, track_ids: Vec<u32> },
+
+    /// Supprime (dissout) un groupe.
+    DissolveTrackGroup { group_id: u32 },
+
+    /// Règle le volume du groupe (multiplicateur appliqué à toutes les pistes enfants).
+    SetGroupVolume { group_id: u32, volume: f32 },
 }
 
 /// Paramètre de synthé encodé comme enum (pas de String → pas d'allocation/déallocation dans le callback).
@@ -196,37 +258,111 @@ pub enum SynthParam {
     Octave,
     Detune,
     Volume,
+    // ── Phase 5 ─────────────────────────────────────────────────────
+    Osc2Enabled,
+    Osc2Waveform,
+    Osc2Octave,
+    Osc2Detune,
+    OscMix,
+    Lfo1Waveform,
+    Lfo1Rate,
+    Lfo1Depth,
+    Lfo1Destination,
+    Lfo1Sync,
+    Lfo2Waveform,
+    Lfo2Rate,
+    Lfo2Depth,
+    Lfo2Destination,
+    Lfo2Sync,
+    SynthMode,
+    GlideTime,
+    // ── Phase 5.2 ───────────────────────────────────────────────────
+    FilterType,
+    Drive,
+    FilterEnvAmount,
+    FilterEnvAttack,
+    FilterEnvDecay,
+    FilterEnvSustain,
+    FilterEnvRelease,
 }
 
 impl SynthParam {
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
-            "waveform"  => Some(Self::Waveform),
-            "attack"    => Some(Self::Attack),
-            "decay"     => Some(Self::Decay),
-            "sustain"   => Some(Self::Sustain),
-            "release"   => Some(Self::Release),
-            "cutoff"    => Some(Self::Cutoff),
-            "resonance" => Some(Self::Resonance),
-            "octave"    => Some(Self::Octave),
-            "detune"    => Some(Self::Detune),
-            "volume"    => Some(Self::Volume),
-            _           => None,
+            "waveform"         => Some(Self::Waveform),
+            "attack"           => Some(Self::Attack),
+            "decay"            => Some(Self::Decay),
+            "sustain"          => Some(Self::Sustain),
+            "release"          => Some(Self::Release),
+            "cutoff"           => Some(Self::Cutoff),
+            "resonance"        => Some(Self::Resonance),
+            "octave"           => Some(Self::Octave),
+            "detune"           => Some(Self::Detune),
+            "volume"           => Some(Self::Volume),
+            "osc2_enabled"     => Some(Self::Osc2Enabled),
+            "osc2_waveform"    => Some(Self::Osc2Waveform),
+            "osc2_octave"      => Some(Self::Osc2Octave),
+            "osc2_detune"      => Some(Self::Osc2Detune),
+            "osc_mix"          => Some(Self::OscMix),
+            "lfo1_waveform"    => Some(Self::Lfo1Waveform),
+            "lfo1_rate"        => Some(Self::Lfo1Rate),
+            "lfo1_depth"       => Some(Self::Lfo1Depth),
+            "lfo1_destination" => Some(Self::Lfo1Destination),
+            "lfo1_sync"        => Some(Self::Lfo1Sync),
+            "lfo2_waveform"    => Some(Self::Lfo2Waveform),
+            "lfo2_rate"        => Some(Self::Lfo2Rate),
+            "lfo2_depth"       => Some(Self::Lfo2Depth),
+            "lfo2_destination" => Some(Self::Lfo2Destination),
+            "lfo2_sync"        => Some(Self::Lfo2Sync),
+            "synth_mode"       => Some(Self::SynthMode),
+            "glide_time"       => Some(Self::GlideTime),
+            "filter_type"      => Some(Self::FilterType),
+            "drive"            => Some(Self::Drive),
+            "filter_env_amount"  => Some(Self::FilterEnvAmount),
+            "filter_env_attack"  => Some(Self::FilterEnvAttack),
+            "filter_env_decay"   => Some(Self::FilterEnvDecay),
+            "filter_env_sustain" => Some(Self::FilterEnvSustain),
+            "filter_env_release" => Some(Self::FilterEnvRelease),
+            _                  => None,
         }
     }
 
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Waveform  => "waveform",
-            Self::Attack    => "attack",
-            Self::Decay     => "decay",
-            Self::Sustain   => "sustain",
-            Self::Release   => "release",
-            Self::Cutoff    => "cutoff",
-            Self::Resonance => "resonance",
-            Self::Octave    => "octave",
-            Self::Detune    => "detune",
-            Self::Volume    => "volume",
+            Self::Waveform         => "waveform",
+            Self::Attack           => "attack",
+            Self::Decay            => "decay",
+            Self::Sustain          => "sustain",
+            Self::Release          => "release",
+            Self::Cutoff           => "cutoff",
+            Self::Resonance        => "resonance",
+            Self::Octave           => "octave",
+            Self::Detune           => "detune",
+            Self::Volume           => "volume",
+            Self::Osc2Enabled      => "osc2_enabled",
+            Self::Osc2Waveform     => "osc2_waveform",
+            Self::Osc2Octave       => "osc2_octave",
+            Self::Osc2Detune       => "osc2_detune",
+            Self::OscMix           => "osc_mix",
+            Self::Lfo1Waveform     => "lfo1_waveform",
+            Self::Lfo1Rate         => "lfo1_rate",
+            Self::Lfo1Depth        => "lfo1_depth",
+            Self::Lfo1Destination  => "lfo1_destination",
+            Self::Lfo1Sync         => "lfo1_sync",
+            Self::Lfo2Waveform     => "lfo2_waveform",
+            Self::Lfo2Rate         => "lfo2_rate",
+            Self::Lfo2Depth        => "lfo2_depth",
+            Self::Lfo2Destination  => "lfo2_destination",
+            Self::Lfo2Sync         => "lfo2_sync",
+            Self::SynthMode        => "synth_mode",
+            Self::GlideTime        => "glide_time",
+            Self::FilterType       => "filter_type",
+            Self::Drive            => "drive",
+            Self::FilterEnvAmount  => "filter_env_amount",
+            Self::FilterEnvAttack  => "filter_env_attack",
+            Self::FilterEnvDecay   => "filter_env_decay",
+            Self::FilterEnvSustain => "filter_env_sustain",
+            Self::FilterEnvRelease => "filter_env_release",
         }
     }
 }

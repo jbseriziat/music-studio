@@ -11,6 +11,10 @@ pub struct ProjectSummary {
 }
 
 /// Retourne le dossier home de l'utilisateur.
+pub fn home_dir_path() -> Result<PathBuf, String> {
+    home_dir()
+}
+
 fn home_dir() -> Result<PathBuf, String> {
     #[cfg(unix)]
     {

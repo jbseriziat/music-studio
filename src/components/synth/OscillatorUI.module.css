@@ -16,7 +16,7 @@
 /* ── Waveform buttons ──────────────────────────────────────────────────────── */
 .waveformButtons {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(46px, 1fr));
   gap: 4px;
 }
 
@@ -68,4 +68,69 @@
   display: flex;
   justify-content: center;
   gap: 20px;
+}
+
+/* ── Phase 5 : Section header with toggle ────────────────────────────────── */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toggleBtn {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 4px;
+  background: var(--color-surface, #1a1a1a);
+  color: var(--color-text-muted, #666);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.toggleBtn:hover {
+  border-color: var(--color-accent-dim, #555);
+}
+
+.toggleActive {
+  background: color-mix(in srgb, #4CAF50 30%, transparent);
+  border-color: #4CAF50;
+  color: #4CAF50;
+}
+
+/* ── Phase 5 : Osc Mix slider ────────────────────────────────────────────── */
+.mixRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.mixLabel {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--color-text-muted, #666);
+  white-space: nowrap;
+}
+
+.mixSlider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border, #333);
+  outline: none;
+  cursor: pointer;
+}
+
+.mixSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-accent, #9C27B0);
+  cursor: pointer;
 }

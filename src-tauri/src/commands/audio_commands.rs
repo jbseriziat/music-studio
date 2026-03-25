@@ -378,3 +378,226 @@ pub fn get_compressor_gain_reduction(
         None => Ok(0.0),
     }
 }
+
+// ── Matrice de modulation (Phase 5.2) ─────────────────────────────────────────
+
+/// Compteur global d'ID de routages de modulation.
+static MOD_ROUTE_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+/// Ajoute un routage de modulation au synthé d'une piste. Retourne l'ID du routage.
+#[tauri::command]
+pub fn add_modulation_route(
+    track_id: u32,
+    source: u32,
+    destination: u32,
+    amount: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<u32, String> {
+    let route_id = MOD_ROUTE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::AddModRoute { track_id, route_id, source, destination, amount },
+    );
+    Ok(route_id)
+}
+
+/// Met à jour l'intensité d'un routage existant.
+#[tauri::command]
+pub fn update_modulation_route(
+    track_id: u32,
+    route_id: u32,
+    amount: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::UpdateModRoute { track_id, route_id, amount },
+    );
+    Ok(())
+}
+
+/// Supprime un routage de modulation.
+#[tauri::command]
+pub fn remove_modulation_route(
+    track_id: u32,
+    route_id: u32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::RemoveModRoute { track_id, route_id },
+    );
+    Ok(())
+}
+
+// ── Master Chain (Phase 5.3) ──────────────────────────────────────────────────
+
+/// Active/désactive la chaîne de mastering.
+#[tauri::command]
+pub fn set_master_chain_enabled(
+    enabled: bool,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetMasterChainEnabled { enabled },
+    );
+    Ok(())
+}
+
+/// Règle une bande de l'EQ master (0–4). gain_db : -12 à +12, freq : 20–20000, q : 0.1–10.
+#[tauri::command]
+pub fn set_master_eq_band(
+    band: u8,
+    gain_db: f32,
+    freq: f32,
+    q: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    if band >= 5 { return Err("Band index 0–4".to_string()); }
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetMasterEqBand { band, gain_db, freq, q },
+    );
+    Ok(())
+}
+
+/// Règle le threshold du limiteur brickwall (en dB, -12 à 0).
+#[tauri::command]
+pub fn set_limiter_threshold(
+    threshold_db: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetLimiterThreshold { threshold_db },
+    );
+    Ok(())
+}
+
+/// Active/désactive le limiteur.
+#[tauri::command]
+pub fn set_limiter_enabled(
+    enabled: bool,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetLimiterEnabled { enabled },
+    );
+    Ok(())
+}
+
+/// Reset le LUFS meter (nouveau morceau / repositionnement).
+#[tauri::command]
+pub fn reset_lufs(engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(AudioCommand::ResetLufs);
+    Ok(())
+}
+
+// ── Bus d'effets Send/Return (Phase 5.4) ──────────────────────────────────────
+
+static BUS_ID_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+/// Crée un bus d'effets. Retourne l'ID du bus.
+#[tauri::command]
+pub fn create_bus(name: String, engine: State<Mutex<AudioEngine>>) -> Result<u32, String> {
+    let bus_id = BUS_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::CreateBus { bus_id, name },
+    );
+    Ok(bus_id)
+}
+
+/// Supprime un bus d'effets.
+#[tauri::command]
+pub fn delete_bus(bus_id: u32, engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::DeleteBus { bus_id },
+    );
+    Ok(())
+}
+
+/// Ajoute un effet à un bus. Retourne l'ID de l'effet.
+#[tauri::command]
+pub fn add_bus_effect(
+    bus_id: u32,
+    effect_type: String,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<u32, String> {
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    let effect_id = eng.next_effect_id.fetch_add(1, Ordering::Relaxed);
+    let sample_rate = eng.config.sample_rate;
+
+    let boxed: BoxedEffect = match effect_type.as_str() {
+        "reverb" => BoxedEffect(Box::new(Reverb::new())),
+        "delay" => BoxedEffect(Box::new(Delay::new(sample_rate))),
+        "eq" => BoxedEffect(Box::new(Eq::new(sample_rate))),
+        "compressor" => {
+            let arc = Arc::new(AtomicU32::new(0));
+            BoxedEffect(Box::new(Compressor::new(sample_rate, Arc::clone(&arc))))
+        }
+        other => return Err(format!("Type d'effet inconnu : {other}")),
+    };
+
+    eng.send_command(AudioCommand::AddBusEffect { bus_id, effect_id, effect: boxed });
+    Ok(effect_id)
+}
+
+/// Règle le volume d'un bus (0.0–2.0).
+#[tauri::command]
+pub fn set_bus_volume(bus_id: u32, volume: f32, engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetBusVolume { bus_id, volume },
+    );
+    Ok(())
+}
+
+/// Règle le send amount d'une piste vers un bus (0.0–1.0).
+#[tauri::command]
+pub fn set_send_amount(
+    track_id: u32,
+    bus_id: u32,
+    amount: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetSendAmount { track_id, bus_id, amount },
+    );
+    Ok(())
+}
+
+// ── Track Groups (Phase 5.5) ──────────────────────────────────────────────────
+
+static GROUP_ID_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+/// Crée un groupe de pistes. Retourne l'ID du groupe.
+#[tauri::command]
+pub fn create_track_group(
+    track_ids: Vec<u32>,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<u32, String> {
+    let group_id = GROUP_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::CreateTrackGroup { group_id, track_ids },
+    );
+    Ok(group_id)
+}
+
+/// Dissout un groupe de pistes.
+#[tauri::command]
+pub fn dissolve_track_group(
+    group_id: u32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::DissolveTrackGroup { group_id },
+    );
+    Ok(())
+}
+
+/// Règle le volume d'un groupe (multiplicateur, 0.0–4.0).
+#[tauri::command]
+pub fn set_group_volume(
+    group_id: u32,
+    volume: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetGroupVolume { group_id, volume },
+    );
+    Ok(())
+}

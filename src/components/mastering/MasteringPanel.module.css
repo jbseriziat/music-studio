@@ -1,0 +1,200 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--color-surface, #1a1a1a);
+  border-radius: 12px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.icon { font-size: 20px; }
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.enableBtn {
+  margin-left: auto;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 4px;
+  background: var(--color-surface-deep, #0a0a0a);
+  color: var(--color-text-muted, #666);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.enableActive {
+  background: color-mix(in srgb, #4CAF50 25%, transparent);
+  border-color: #4CAF50;
+  color: #4CAF50;
+}
+
+.subTitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary, #aaa);
+}
+
+/* ── Spectrum ──────────────────────────────────────────────────────────────── */
+.spectrumCanvas {
+  display: block;
+  background: #0a0a0a;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+/* ── EQ ────────────────────────────────────────────────────────────────────── */
+.eqSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eqBands {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.eqBand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  background: var(--color-surface-deep, #0a0a0a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 6px;
+  border-top-width: 2px;
+}
+
+.bandLabel {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* ── Bottom row (Limiter + LUFS) ───────────────────────────────────────────── */
+.bottomRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* ── Limiter ───────────────────────────────────────────────────────────────── */
+.limiterSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--color-surface-deep, #0a0a0a);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.limiterRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: center;
+}
+
+.grColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.grLabel {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-text-muted, #666);
+}
+
+.grBarOuter {
+  width: 12px;
+  height: 60px;
+  background: #1a1a1a;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.grBarInner {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #FF9800;
+  border-radius: 0 0 2px 2px;
+  transition: height 0.05s linear;
+}
+
+.grValue {
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted, #888);
+}
+
+/* ── LUFS ──────────────────────────────────────────────────────────────────── */
+.loudnessSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--color-surface-deep, #0a0a0a);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.lufsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.lufsItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.lufsLabel {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-text-muted, #666);
+}
+
+.lufsValue {
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.lufsTarget {
+  font-size: 9px;
+  color: var(--color-text-muted, #555);
+  text-align: center;
+}

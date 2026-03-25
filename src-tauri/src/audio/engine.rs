@@ -13,7 +13,7 @@ use super::commands::AudioCommand;
 use super::config::AudioConfig;
 use crate::effects::EffectChain;
 use crate::midi::MidiClip;
-use crate::mixer::{MeterReport, TrackMeterData};
+use crate::mixer::{MasterChain, MeterReport, TrackMeterData};
 use crate::synth::SynthEngine;
 use crate::transport::Metronome;
 
@@ -139,6 +139,15 @@ struct TimelineClip {
     track_id: u32,
 }
 
+// ─── Groupe de pistes (Phase 5.5) ────────────────────────────────────────────
+struct TrackGroup {
+    id: u32,
+    /// Track IDs (% 64) dans le groupe.
+    track_ids: Vec<u32>,
+    /// Volume multiplicateur du groupe (1.0 = nominal).
+    volume: f32,
+}
+
 // ─── État du callback audio ───────────────────────────────────────────────────
 struct AudioCallbackState {
     master_volume: f32,
@@ -254,10 +263,19 @@ struct AudioCallbackState {
     automation_pan: Vec<Vec<(f64, f32)>>,
 
     // ─── Enregistrement du synthé (capture lock-free) ────────────────────────
-    /// ID de la piste synthé dont on capture la sortie. `None` = pas d'enregistrement.
     synth_record_track_id: Option<u32>,
-    /// Producteur du ring buffer vers le thread d'écriture WAV. `None` = pas d'enregistrement.
     synth_record_producer: Option<ringbuf::HeapProd<f32>>,
+
+    // ─── Bus d'effets Send/Return (Phase 5.4) ────────────────────────────────
+    buses: Vec<crate::mixer::EffectBus>,
+    /// Sends par piste : sends[track_id % 64] = Vec<Send>.
+    sends: Vec<Vec<crate::mixer::Send>>,
+
+    // ─── Track Groups (Phase 5.5) ──────────────────────────────────────────────
+    track_groups: Vec<TrackGroup>,
+
+    // ─── Master Chain (Phase 5.3) ────────────────────────────────────────────
+    master_chain: MasterChain,
 
     // ─── Atomics partagés avec le thread principal ────────────────────────────
     position_atomic: Arc<AtomicU64>,
@@ -387,6 +405,10 @@ impl AudioCallbackState {
                 // samples_per_step = SR * 60 / (bpm * 4) pour du 1/16 à 4/4
                 self.samples_per_step = (self.sample_rate as f64 * 60.0) / (self.bpm * 4.0);
                 self.bpm_atomic.store(self.bpm.to_bits(), Ordering::Relaxed);
+                // Propager le BPM aux moteurs synthé (pour le LFO sync).
+                for eng in &mut self.synth_engines {
+                    eng.bpm = self.bpm;
+                }
             }
             AudioCommand::SetDrumStep { pad, step, active, velocity } => {
                 let p = pad as usize;
@@ -590,8 +612,98 @@ impl AudioCallbackState {
             }
             AudioCommand::ClearSynthRecord => {
                 self.synth_record_track_id = None;
-                // Drop du HeapProd → ferme le ring buffer côté producteur.
                 self.synth_record_producer = None;
+            }
+
+            // ── Matrice de modulation (Phase 5.2) ───────────────────────
+            AudioCommand::AddModRoute { track_id, route_id, source, destination, amount } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    use crate::synth::lfo::{ModSource, ModDestination, ModRoute};
+                    let src = ModSource::from_index(source);
+                    let dest = ModDestination::from_str(match destination {
+                        0 => "pitch", 1 => "cutoff", 2 => "volume",
+                        3 => "pan", 4 => "osc2pitch", 5 => "resonance",
+                        _ => "pitch",
+                    }).unwrap_or(ModDestination::Pitch);
+                    self.synth_engines[slot].mod_routes.push(ModRoute {
+                        id: route_id,
+                        source: src,
+                        destination: dest,
+                        amount: amount.clamp(-1.0, 1.0),
+                    });
+                }
+            }
+            AudioCommand::UpdateModRoute { track_id, route_id, amount } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    self.synth_engines[slot].update_mod_route(route_id, amount);
+                }
+            }
+            AudioCommand::RemoveModRoute { track_id, route_id } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    self.synth_engines[slot].remove_mod_route(route_id);
+                }
+            }
+
+            // ── Master Chain (Phase 5.3) ─────────────────────────────
+            AudioCommand::SetMasterChainEnabled { enabled } => {
+                self.master_chain.enabled = enabled;
+            }
+            AudioCommand::SetMasterEqBand { band, gain_db, freq, q } => {
+                self.master_chain.eq.set_band(band, gain_db, freq, q);
+            }
+            AudioCommand::SetLimiterThreshold { threshold_db } => {
+                self.master_chain.limiter.set_threshold_db(threshold_db);
+            }
+            AudioCommand::SetLimiterEnabled { enabled } => {
+                self.master_chain.limiter.enabled = enabled;
+            }
+            AudioCommand::ResetLufs => {
+                self.master_chain.lufs_meter.reset();
+            }
+
+            // ── Bus d'effets Send/Return (Phase 5.4) ────────────────
+            AudioCommand::CreateBus { bus_id, name } => {
+                if self.buses.len() < crate::mixer::MAX_BUSES {
+                    self.buses.push(crate::mixer::EffectBus::new(bus_id, name));
+                }
+            }
+            AudioCommand::DeleteBus { bus_id } => {
+                self.buses.retain(|b| b.id != bus_id);
+                // Remove all sends pointing to this bus.
+                for sends in &mut self.sends {
+                    sends.retain(|s| s.bus_id != bus_id);
+                }
+            }
+            AudioCommand::AddBusEffect { bus_id, effect_id, effect } => {
+                if let Some(bus) = self.buses.iter_mut().find(|b| b.id == bus_id) {
+                    bus.effect_chain.add_with_id(effect_id, effect.0);
+                }
+            }
+            AudioCommand::SetBusVolume { bus_id, volume } => {
+                if let Some(bus) = self.buses.iter_mut().find(|b| b.id == bus_id) {
+                    bus.volume = volume.clamp(0.0, 2.0);
+                }
+            }
+            AudioCommand::SetSendAmount { track_id, bus_id, amount } => {
+                let tidx = (track_id % 64) as usize;
+                if let Some(s) = self.sends[tidx].iter_mut().find(|s| s.bus_id == bus_id) {
+                    s.amount = amount.clamp(0.0, 1.0);
+                } else if amount > 0.0 {
+                    self.sends[tidx].push(crate::mixer::Send { bus_id, amount: amount.clamp(0.0, 1.0) });
+                }
+            }
+
+            // ── Track Groups (Phase 5.5) ─────────────────────────────
+            AudioCommand::CreateTrackGroup { group_id, track_ids } => {
+                self.track_groups.push(TrackGroup { id: group_id, track_ids, volume: 1.0 });
+            }
+            AudioCommand::DissolveTrackGroup { group_id } => {
+                self.track_groups.retain(|g| g.id != group_id);
+            }
+            AudioCommand::SetGroupVolume { group_id, volume } => {
+                if let Some(g) = self.track_groups.iter_mut().find(|g| g.id == group_id) {
+                    g.volume = volume.clamp(0.0, 4.0);
+                }
             }
         }
     }
@@ -788,6 +900,13 @@ impl AudioEngine {
             // Enregistrement synthé : inactif par défaut.
             synth_record_track_id: None,
             synth_record_producer: None,
+            // Bus d'effets (Phase 5.4)
+            buses: Vec::with_capacity(crate::mixer::MAX_BUSES),
+            sends: vec![Vec::new(); 64],
+            // Track Groups (Phase 5.5)
+            track_groups: Vec::with_capacity(8),
+            // Master Chain (Phase 5.3)
+            master_chain: MasterChain::new(sample_rate),
             // Atomics
             position_atomic: position_atomic_cb,
             is_playing_atomic: is_playing_atomic_cb,
@@ -1075,12 +1194,31 @@ impl AudioEngine {
                         }
                     }
 
-                    // ── Effets par piste + metering centralisé ───────────────
+                    // ── Appliquer le volume des groupes de pistes (Phase 5.5) ─
+                    for group in &state.track_groups {
+                        for &tid in &group.track_ids {
+                            let tidx = (tid % 64) as usize;
+                            track_bufs[tidx].0 *= group.volume;
+                            track_bufs[tidx].1 *= group.volume;
+                        }
+                    }
+
+                    // ── Sidechain : stocker le niveau pré-effet par piste (Phase 5.5) ─
+                    let mut pre_fx_peaks = [0.0f32; 64];
                     for tidx in 0..64usize {
                         let (tl, tr) = track_bufs[tidx];
-                        // Appliquer la chaîne d'effets (pass-through si vide).
+                        pre_fx_peaks[tidx] = tl.abs().max(tr.abs());
+                    }
+
+                    // ── Injecter les niveaux sidechain dans les compresseurs ──
+                    for tidx in 0..64usize {
+                        state.effect_chains[tidx].inject_sidechain_levels(&pre_fx_peaks);
+                    }
+
+                    // ── Effets par piste + metering + sends vers bus ───────
+                    for tidx in 0..64usize {
+                        let (tl, tr) = track_bufs[tidx];
                         let (el, er) = state.effect_chains[tidx].process(tl, tr);
-                        // Metering après effets (uniquement pour les pistes connues).
                         if state.track_known_ids[tidx] != NO_TRACK {
                             let ea = el.abs();
                             let ea_r = er.abs();
@@ -1090,15 +1228,33 @@ impl AudioEngine {
                             state.track_rms_sum_r[tidx] += (er * er) as f64;
                             state.track_rms_count[tidx] += 1;
                         }
+                        // Send vers les bus (Phase 5.4) — post-effets, pre-master.
+                        for send in &state.sends[tidx] {
+                            if send.amount > 0.0 {
+                                if let Some(bus) = state.buses.iter_mut().find(|b| b.id == send.bus_id) {
+                                    bus.feed(el * send.amount, er * send.amount);
+                                }
+                            }
+                        }
                         left += el;
                         right += er;
                     }
 
-                    // Clamp + volume master.
-                    let pre_l = left * state.master_volume;
-                    let pre_r = right * state.master_volume;
+                    // ── Bus d'effets : traiter et mixer (Phase 5.4) ────────
+                    for bus in &mut state.buses {
+                        let (bl, br) = bus.process();
+                        left += bl;
+                        right += br;
+                    }
 
-                    // Accumulate master meter (avant clamp).
+                    // Volume master.
+                    let vol_l = left * state.master_volume;
+                    let vol_r = right * state.master_volume;
+
+                    // Master Chain (EQ → Limiter, LUFS, Spectrum) — Phase 5.3.
+                    let (pre_l, pre_r) = state.master_chain.process(vol_l, vol_r);
+
+                    // Accumulate master meter (post-mastering).
                     let abs_l = pre_l.abs();
                     let abs_r = pre_r.abs();
                     if abs_l > state.master_peak_l { state.master_peak_l = abs_l; }
@@ -1137,6 +1293,13 @@ impl AudioEngine {
                                 state.track_rms_sum_r[i] = 0.0;
                                 state.track_rms_count[i] = 0;
                             }
+                            // Mastering data (Phase 5.3)
+                            report.lufs_momentary = state.master_chain.lufs_meter.get_momentary();
+                            report.lufs_shortterm = state.master_chain.lufs_meter.get_shortterm();
+                            report.lufs_integrated = state.master_chain.lufs_meter.get_integrated();
+                            report.true_peak_db = state.master_chain.lufs_meter.get_true_peak_db();
+                            report.limiter_gr_db = state.master_chain.limiter.gain_reduction_db();
+                            report.spectrum = state.master_chain.spectrum.bins.to_vec();
                         }
                         // Reset accumulateurs master (même si try_lock a échoué)
                         state.master_peak_l = 0.0;

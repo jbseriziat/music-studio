@@ -17,7 +17,6 @@ pub struct Compressor {
     makeup_db:    f32,
     sample_rate:  u32,
 
-    /// Coefficient d'attack (proche de 1 = lent, proche de 0 = rapide).
     attack_coeff:  f32,
     release_coeff: f32,
 
@@ -26,6 +25,11 @@ pub struct Compressor {
 
     /// Valeur publiée : réduction de gain en dB (≥ 0) — bits f32 atomiques.
     pub gain_reduction_out: Arc<AtomicU32>,
+
+    /// Sidechain : ID de la piste source (None = pas de sidechain). Phase 5.5.
+    pub sidechain_source: Option<u32>,
+    /// Signal sidechain externe injecté (peak level, mis à jour par le callback). Phase 5.5.
+    pub sidechain_level: f32,
 }
 
 impl Compressor {
@@ -44,6 +48,8 @@ impl Compressor {
             release_coeff: Self::ms_to_coeff(release_ms, sr),
             envelope_db:   0.0,
             gain_reduction_out,
+            sidechain_source: None,
+            sidechain_level: 0.0,
         }
     }
 
@@ -62,8 +68,12 @@ impl Compressor {
 
 impl Effect for Compressor {
     fn process(&mut self, input_l: f32, input_r: f32) -> (f32, f32) {
-        // Détection du niveau crête stéréo en dB.
-        let peak = input_l.abs().max(input_r.abs());
+        // Détection du niveau : sidechain si actif, sinon signal d'entrée.
+        let peak = if self.sidechain_source.is_some() && self.sidechain_level > 0.0 {
+            self.sidechain_level
+        } else {
+            input_l.abs().max(input_r.abs())
+        };
         let input_db = if peak > 1e-7 { 20.0 * peak.log10() } else { -140.0 };
 
         // Gain de réduction cible (négatif quand au-dessus du seuil).
@@ -99,6 +109,10 @@ impl Effect for Compressor {
             "attack"    => { self.attack_ms  = value.clamp(0.1, 100.0);  self.recalc_coeffs(); }
             "release"   => { self.release_ms = value.clamp(10.0, 1000.0); self.recalc_coeffs(); }
             "makeup"    => self.makeup_db    = value.clamp(0.0, 24.0),
+            "sidechain" => {
+                self.sidechain_source = if value > 0.0 { Some(value as u32) } else { None };
+            }
+            "_sidechain_level" => { self.sidechain_level = value; }
             _ => {}
         }
     }
@@ -110,6 +124,7 @@ impl Effect for Compressor {
             "attack"    => self.attack_ms,
             "release"   => self.release_ms,
             "makeup"    => self.makeup_db,
+            "sidechain" => self.sidechain_source.map(|v| v as f32).unwrap_or(-1.0),
             _ => 0.0,
         }
     }
@@ -121,6 +136,7 @@ impl Effect for Compressor {
             ("attack".into(),    self.attack_ms),
             ("release".into(),   self.release_ms),
             ("makeup".into(),    self.makeup_db),
+            ("sidechain".into(), self.sidechain_source.map(|v| v as f32).unwrap_or(-1.0)),
         ]
     }
 

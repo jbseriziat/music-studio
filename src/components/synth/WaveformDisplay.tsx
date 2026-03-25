@@ -66,6 +66,16 @@ function buildPath(waveform: Waveform, w: number, h: number): string {
       case 'triangle':
         y = 4 * Math.abs(phase - Math.round(phase)) - 1;
         break;
+      case 'noise':
+        // Pseudo-random but deterministic per sample for consistent display.
+        y = Math.sin(i * 127.1 + 311.7) * Math.cos(i * 269.5 + 183.3);
+        y = y * 2;
+        y = Math.max(-1, Math.min(1, y));
+        break;
+      case 'pulsewidth':
+        // Pulse width at 0.3 duty cycle for visual distinction from square.
+        y = phase < 0.3 ? 1 : -1;
+        break;
       default:
         y = 0;
     }

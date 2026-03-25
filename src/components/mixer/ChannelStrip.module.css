@@ -43,6 +43,13 @@
   min-height: 24px;
 }
 
+.sendRow {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .panRow {
   display: flex;
   justify-content: center;

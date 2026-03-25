@@ -224,6 +224,25 @@ export const getProjectPath = (name: string): Promise<string> =>
 export const deleteProjectFile = (path: string): Promise<void> =>
   invoke<void>('delete_project', { path });
 
+// ─── Templates (Phase 5.6) ───────────────────────────────────────────────────
+
+export interface TemplateInfoDto {
+  name: string;
+  path: string;
+}
+
+/** Sauvegarde la config actuelle comme template. */
+export const saveAsTemplate = (name: string, project: MspProject): Promise<void> =>
+  invoke<void>('save_as_template', { name, project });
+
+/** Liste les templates disponibles (prédéfinis + utilisateur). */
+export const listTemplatesCmd = (): Promise<TemplateInfoDto[]> =>
+  invoke<TemplateInfoDto[]>('list_templates');
+
+/** Charge un template par nom et retourne un MspProject pré-configuré. */
+export const loadTemplateCmd = (name: string): Promise<MspProject> =>
+  invoke<MspProject>('load_template', { name });
+
 // ─── Drum Rack & Séquenceur ───────────────────────────────────────────────────
 
 export interface DrumPatternDto {
@@ -554,3 +573,89 @@ export const getAutomationLane = (
 /** Efface toutes les lanes d'automation d'une piste (chargement de projet). */
 export const clearTrackAutomation = (trackId: number): Promise<void> =>
   invoke<void>('clear_track_automation', { trackId });
+
+// ─── Matrice de modulation (Phase 5.2) ───────────────────────────────────────
+
+/** Ajoute un routage de modulation. source/destination sont des index numériques. Retourne l'ID. */
+export const addModulationRoute = (
+  trackId: number,
+  source: number,
+  destination: number,
+  amount: number,
+): Promise<number> =>
+  invoke<number>('add_modulation_route', { trackId, source, destination, amount });
+
+/** Met à jour l'intensité d'un routage existant. */
+export const updateModulationRoute = (
+  trackId: number,
+  routeId: number,
+  amount: number,
+): Promise<void> =>
+  invoke<void>('update_modulation_route', { trackId, routeId, amount });
+
+/** Supprime un routage de modulation. */
+export const removeModulationRoute = (
+  trackId: number,
+  routeId: number,
+): Promise<void> =>
+  invoke<void>('remove_modulation_route', { trackId, routeId });
+
+// ─── Master Chain / Mastering (Phase 5.3) ────────────────────────────────────
+
+/** Active/désactive la chaîne de mastering. */
+export const setMasterChainEnabled = (enabled: boolean): Promise<void> =>
+  invoke<void>('set_master_chain_enabled', { enabled });
+
+/** Règle une bande de l'EQ master (0–4). */
+export const setMasterEqBand = (
+  band: number, gainDb: number, freq: number, q: number,
+): Promise<void> =>
+  invoke<void>('set_master_eq_band', { band, gainDb, freq, q });
+
+/** Règle le threshold du limiteur (-12 à 0 dB). */
+export const setLimiterThreshold = (thresholdDb: number): Promise<void> =>
+  invoke<void>('set_limiter_threshold', { thresholdDb });
+
+/** Active/désactive le limiteur. */
+export const setLimiterEnabled = (enabled: boolean): Promise<void> =>
+  invoke<void>('set_limiter_enabled', { enabled });
+
+/** Reset le LUFS meter. */
+export const resetLufs = (): Promise<void> =>
+  invoke<void>('reset_lufs');
+
+// ─── Bus d'effets Send/Return (Phase 5.4) ────────────────────────────────────
+
+/** Crée un bus d'effets. Retourne l'ID du bus. */
+export const createBus = (name: string): Promise<number> =>
+  invoke<number>('create_bus', { name });
+
+/** Supprime un bus d'effets. */
+export const deleteBus = (busId: number): Promise<void> =>
+  invoke<void>('delete_bus', { busId });
+
+/** Ajoute un effet à un bus. Retourne l'ID de l'effet. */
+export const addBusEffect = (busId: number, effectType: string): Promise<number> =>
+  invoke<number>('add_bus_effect', { busId, effectType });
+
+/** Règle le volume d'un bus (0.0–2.0). */
+export const setBusVolume = (busId: number, volume: number): Promise<void> =>
+  invoke<void>('set_bus_volume', { busId, volume });
+
+/** Règle le send amount d'une piste vers un bus (0.0–1.0). */
+export const setSendAmount = (trackId: number, busId: number, amount: number): Promise<void> =>
+  invoke<void>('set_send_amount', { trackId, busId, amount });
+
+// ─── Track Groups (Phase 5.5) ────────────────────────────────────────────────
+
+/** Crée un groupe de pistes. Retourne l'ID du groupe. */
+export const createTrackGroup = (trackIds: number[]): Promise<number> =>
+  invoke<number>('create_track_group', { trackIds });
+
+/** Dissout un groupe de pistes. */
+export const dissolveTrackGroup = (groupId: number): Promise<void> =>
+  invoke<void>('dissolve_track_group', { groupId });
+
+/** Règle le volume d'un groupe (multiplicateur). */
+export const setGroupVolume = (groupId: number, volume: number): Promise<void> =>
+  invoke<void>('set_group_volume', { groupId, volume });

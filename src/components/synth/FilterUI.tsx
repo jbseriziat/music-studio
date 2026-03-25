@@ -2,6 +2,15 @@ import { useCallback, useMemo } from 'react';
 import styles from './FilterUI.module.css';
 import { Knob } from '../shared/Knob';
 import { useSynthStore } from '../../stores/synthStore';
+import { useFeatureLevel } from '../../hooks/useFeatureLevel';
+
+const FILTER_TYPES = [
+  { index: 0, label: 'LP 12dB' },
+  { index: 1, label: 'LP 24dB' },
+  { index: 2, label: 'HP' },
+  { index: 3, label: 'BP' },
+  { index: 4, label: 'Notch' },
+];
 
 const W = 220;
 const H = 64;
@@ -16,9 +25,12 @@ const PAD = 8;
 export function FilterUI() {
   const { params, setParam } = useSynthStore();
   const { cutoff, resonance } = params;
+  const { isVisible } = useFeatureLevel();
 
   const handleCutoff    = useCallback((v: number) => setParam('cutoff',    v), [setParam]);
   const handleResonance = useCallback((v: number) => setParam('resonance', v), [setParam]);
+  const handleDrive     = useCallback((v: number) => setParam('drive',     v), [setParam]);
+  const handleFilterType = useCallback((v: number) => setParam('filter_type', v), [setParam]);
 
   // ── Courbe de réponse (low-pass simplifié, graphique uniquement) ─────────────
   const responseCurve = useMemo(() => {
@@ -74,9 +86,27 @@ export function FilterUI() {
   const formatHz = (hz: number) =>
     hz >= 1000 ? `${(hz / 1000).toFixed(1)} kHz` : `${Math.round(hz)} Hz`;
 
+  const filterLabel = isVisible(5) ? FILTER_TYPES[params.filter_type]?.label ?? 'Filtre' : 'Filtre Low-Pass';
+
   return (
     <section className={styles.filterSection}>
-      <h3 className={styles.sectionTitle}>Filtre Low-Pass</h3>
+      <h3 className={styles.sectionTitle}>{filterLabel}</h3>
+
+      {/* Filter type selector — Phase 5 */}
+      {isVisible(5) && (
+        <div className={styles.filterTypeRow}>
+          {FILTER_TYPES.map(ft => (
+            <button
+              key={ft.index}
+              className={`${styles.filterTypeBtn} ${params.filter_type === ft.index ? styles.filterTypeActive : ''}`}
+              onClick={() => handleFilterType(ft.index)}
+              aria-pressed={params.filter_type === ft.index}
+            >
+              {ft.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Courbe de réponse */}
       <svg
@@ -145,6 +175,18 @@ export function FilterUI() {
         <div className={styles.freqDisplay} title="Fréquence de coupure">
           {formatHz(cutoff)}
         </div>
+        {isVisible(5) && (
+          <Knob
+            label="Drive"
+            value={params.drive}
+            min={0}
+            max={1}
+            defaultValue={0}
+            decimals={2}
+            size={46}
+            onChange={handleDrive}
+          />
+        )}
       </div>
     </section>
   );

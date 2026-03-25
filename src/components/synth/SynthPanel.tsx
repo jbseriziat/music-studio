@@ -2,9 +2,14 @@ import { useEffect, useCallback } from 'react';
 import styles from './SynthPanel.module.css';
 import { LevelGate } from '../shared/LevelGate';
 import { OscillatorUI } from './OscillatorUI';
+import { Oscillator2UI } from './Oscillator2UI';
 import { EnvelopeUI } from './EnvelopeUI';
 import { FilterUI } from './FilterUI';
 import { PresetSelector } from './PresetSelector';
+import { LfoUI } from './LfoUI';
+import { SynthModeUI } from './SynthModeUI';
+import { FilterEnvelopeUI } from './FilterEnvelopeUI';
+import { ModMatrixUI } from './ModMatrixUI';
 import { Knob } from '../shared/Knob';
 import { VirtualKeyboard } from '../piano-roll/VirtualKeyboard';
 import { useSynthStore } from '../../stores/synthStore';
@@ -13,9 +18,7 @@ import { useKeyboardMidi } from '../../hooks/useKeyboardMidi';
 
 /**
  * Panneau Synthétiseur (niveau 3+).
- * Initialise le synthé au montage et expose tous les contrôles.
- * Le clavier AZERTY est géré via useKeyboardMidi.
- * Le clavier visuel est rendu par VirtualKeyboard.
+ * Phase 5 : double oscillateur, LFO, mode mono/legato.
  */
 export function SynthPanel() {
   const { init, params, setParam, isInitializing, trackId } = useSynthStore();
@@ -25,12 +28,10 @@ export function SynthPanel() {
     if (trackId !== null) openForTrack(trackId);
   }, [trackId, openForTrack]);
 
-  // Initialise le synthé la première fois
   useEffect(() => {
     init();
   }, [init]);
 
-  // Clavier AZERTY → MIDI (retourne pressedNotes pour illuminer les touches visuelles)
   const { pressedNotes } = useKeyboardMidi(true);
 
   const handleVolume = useCallback((v: number) => setParam('volume', v), [setParam]);
@@ -69,21 +70,30 @@ export function SynthPanel() {
           <PresetSelector />
         </div>
 
-        {/* Contenu principal */}
+        {/* Contenu principal — grille 3 colonnes */}
         <div className={styles.content}>
-          {/* Colonne gauche : Oscillateur */}
+          {/* Colonne gauche : Oscillateurs */}
           <div className={styles.column}>
             <OscillatorUI />
+            <LevelGate level={5}>
+              <Oscillator2UI />
+            </LevelGate>
           </div>
 
-          {/* Colonne milieu : Enveloppe */}
+          {/* Colonne milieu : Enveloppe + Mode (Phase 5) */}
           <div className={styles.column}>
             <EnvelopeUI />
+            <LevelGate level={5}>
+              <SynthModeUI />
+            </LevelGate>
           </div>
 
-          {/* Colonne droite : Filtre + Volume */}
+          {/* Colonne droite : Filtre + Filter Env (Phase 5) + Volume */}
           <div className={styles.column}>
             <FilterUI />
+            <LevelGate level={5}>
+              <FilterEnvelopeUI />
+            </LevelGate>
             <div className={styles.volumeRow}>
               <Knob
                 label="Volume"
@@ -99,7 +109,22 @@ export function SynthPanel() {
           </div>
         </div>
 
-        {/* Clavier virtuel — illuminé selon les touches AZERTY enfoncées */}
+        {/* Phase 5 : LFO + Mod Matrix section */}
+        <LevelGate level={5}>
+          <div className={styles.lfoRow}>
+            <div className={styles.lfoColumn}>
+              <LfoUI index={1} />
+            </div>
+            <div className={styles.lfoColumn}>
+              <LfoUI index={2} />
+            </div>
+          </div>
+          <div className={styles.modMatrixWrapper}>
+            <ModMatrixUI />
+          </div>
+        </LevelGate>
+
+        {/* Clavier virtuel */}
         <VirtualKeyboard pressedNotes={pressedNotes} octaveStart={48} octaveCount={2} />
       </div>
     </LevelGate>

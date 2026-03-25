@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
-use crate::project::{MspProject, ProjectSummary};
+use crate::project::{MspProject, ProjectSummary, TemplateInfo};
 use crate::project::file_io;
+use crate::project::templates;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectInfo {
@@ -48,4 +49,24 @@ pub fn get_project_path(name: String) -> Result<String, String> {
 #[tauri::command]
 pub fn delete_project(path: String) -> Result<(), String> {
     file_io::delete_project_file(&path)
+}
+
+// ── Templates (Phase 5.6) ─────────────────────────────────────────────────────
+
+/// Sauvegarde la config actuelle comme template.
+#[tauri::command]
+pub fn save_as_template(name: String, project: MspProject) -> Result<(), String> {
+    templates::save_as_template(&name, &project)
+}
+
+/// Liste les templates disponibles (prédéfinis + utilisateur).
+#[tauri::command]
+pub fn list_templates() -> Result<Vec<TemplateInfo>, String> {
+    templates::list_templates()
+}
+
+/// Charge un template par nom et retourne un MspProject pré-configuré.
+#[tauri::command]
+pub fn load_template(name: String) -> Result<MspProject, String> {
+    templates::load_template(&name)
 }
