@@ -18,3 +18,23 @@
   flex-shrink: 0;
   margin: 4px 4px;
 }
+
+.addBusBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 8px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--color-surface-deep, #0a0a0a);
+  border: 1px dashed #FF9800;
+  border-radius: 6px;
+  color: #FF9800;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.addBusBtn:hover {
+  background: color-mix(in srgb, #FF9800 10%, transparent);
+}

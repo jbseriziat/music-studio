@@ -214,6 +214,23 @@ pub enum AudioCommand {
 
     /// Reset le LUFS meter (nouveau morceau / repositionnement).
     ResetLufs,
+
+    // ── Bus d'effets Send/Return (Phase 5.4) ─────────────────────────────────
+
+    /// Crée un bus d'effets.
+    CreateBus { bus_id: u32, name: String },
+
+    /// Supprime un bus d'effets.
+    DeleteBus { bus_id: u32 },
+
+    /// Ajoute un effet à un bus (même système que les effets de piste).
+    AddBusEffect { bus_id: u32, effect_id: u32, effect: crate::effects::BoxedEffect },
+
+    /// Règle le volume d'un bus.
+    SetBusVolume { bus_id: u32, volume: f32 },
+
+    /// Règle le send amount d'une piste vers un bus.
+    SetSendAmount { track_id: u32, bus_id: u32, amount: f32 },
 }
 
 /// Paramètre de synthé encodé comme enum (pas de String → pas d'allocation/déallocation dans le callback).

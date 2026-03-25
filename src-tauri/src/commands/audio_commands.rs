@@ -487,3 +487,75 @@ pub fn reset_lufs(engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
     engine.inner().lock().map_err(|e| e.to_string())?.send_command(AudioCommand::ResetLufs);
     Ok(())
 }
+
+// ── Bus d'effets Send/Return (Phase 5.4) ──────────────────────────────────────
+
+static BUS_ID_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+/// Crée un bus d'effets. Retourne l'ID du bus.
+#[tauri::command]
+pub fn create_bus(name: String, engine: State<Mutex<AudioEngine>>) -> Result<u32, String> {
+    let bus_id = BUS_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::CreateBus { bus_id, name },
+    );
+    Ok(bus_id)
+}
+
+/// Supprime un bus d'effets.
+#[tauri::command]
+pub fn delete_bus(bus_id: u32, engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::DeleteBus { bus_id },
+    );
+    Ok(())
+}
+
+/// Ajoute un effet à un bus. Retourne l'ID de l'effet.
+#[tauri::command]
+pub fn add_bus_effect(
+    bus_id: u32,
+    effect_type: String,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<u32, String> {
+    let eng = engine.inner().lock().map_err(|e| e.to_string())?;
+    let effect_id = eng.next_effect_id.fetch_add(1, Ordering::Relaxed);
+    let sample_rate = eng.config.sample_rate;
+
+    let boxed: BoxedEffect = match effect_type.as_str() {
+        "reverb" => BoxedEffect(Box::new(Reverb::new())),
+        "delay" => BoxedEffect(Box::new(Delay::new(sample_rate))),
+        "eq" => BoxedEffect(Box::new(Eq::new(sample_rate))),
+        "compressor" => {
+            let arc = Arc::new(AtomicU32::new(0));
+            BoxedEffect(Box::new(Compressor::new(sample_rate, Arc::clone(&arc))))
+        }
+        other => return Err(format!("Type d'effet inconnu : {other}")),
+    };
+
+    eng.send_command(AudioCommand::AddBusEffect { bus_id, effect_id, effect: boxed });
+    Ok(effect_id)
+}
+
+/// Règle le volume d'un bus (0.0–2.0).
+#[tauri::command]
+pub fn set_bus_volume(bus_id: u32, volume: f32, engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetBusVolume { bus_id, volume },
+    );
+    Ok(())
+}
+
+/// Règle le send amount d'une piste vers un bus (0.0–1.0).
+#[tauri::command]
+pub fn set_send_amount(
+    track_id: u32,
+    bus_id: u32,
+    amount: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetSendAmount { track_id, bus_id, amount },
+    );
+    Ok(())
+}

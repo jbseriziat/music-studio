@@ -257,6 +257,11 @@ struct AudioCallbackState {
     synth_record_track_id: Option<u32>,
     synth_record_producer: Option<ringbuf::HeapProd<f32>>,
 
+    // ─── Bus d'effets Send/Return (Phase 5.4) ────────────────────────────────
+    buses: Vec<crate::mixer::EffectBus>,
+    /// Sends par piste : sends[track_id % 64] = Vec<Send>.
+    sends: Vec<Vec<crate::mixer::Send>>,
+
     // ─── Master Chain (Phase 5.3) ────────────────────────────────────────────
     master_chain: MasterChain,
 
@@ -643,6 +648,38 @@ impl AudioCallbackState {
             AudioCommand::ResetLufs => {
                 self.master_chain.lufs_meter.reset();
             }
+
+            // ── Bus d'effets Send/Return (Phase 5.4) ────────────────
+            AudioCommand::CreateBus { bus_id, name } => {
+                if self.buses.len() < crate::mixer::MAX_BUSES {
+                    self.buses.push(crate::mixer::EffectBus::new(bus_id, name));
+                }
+            }
+            AudioCommand::DeleteBus { bus_id } => {
+                self.buses.retain(|b| b.id != bus_id);
+                // Remove all sends pointing to this bus.
+                for sends in &mut self.sends {
+                    sends.retain(|s| s.bus_id != bus_id);
+                }
+            }
+            AudioCommand::AddBusEffect { bus_id, effect_id, effect } => {
+                if let Some(bus) = self.buses.iter_mut().find(|b| b.id == bus_id) {
+                    bus.effect_chain.add_with_id(effect_id, effect.0);
+                }
+            }
+            AudioCommand::SetBusVolume { bus_id, volume } => {
+                if let Some(bus) = self.buses.iter_mut().find(|b| b.id == bus_id) {
+                    bus.volume = volume.clamp(0.0, 2.0);
+                }
+            }
+            AudioCommand::SetSendAmount { track_id, bus_id, amount } => {
+                let tidx = (track_id % 64) as usize;
+                if let Some(s) = self.sends[tidx].iter_mut().find(|s| s.bus_id == bus_id) {
+                    s.amount = amount.clamp(0.0, 1.0);
+                } else if amount > 0.0 {
+                    self.sends[tidx].push(crate::mixer::Send { bus_id, amount: amount.clamp(0.0, 1.0) });
+                }
+            }
         }
     }
 }
@@ -838,6 +875,9 @@ impl AudioEngine {
             // Enregistrement synthé : inactif par défaut.
             synth_record_track_id: None,
             synth_record_producer: None,
+            // Bus d'effets (Phase 5.4)
+            buses: Vec::with_capacity(crate::mixer::MAX_BUSES),
+            sends: vec![Vec::new(); 64],
             // Master Chain (Phase 5.3)
             master_chain: MasterChain::new(sample_rate),
             // Atomics
@@ -1127,12 +1167,10 @@ impl AudioEngine {
                         }
                     }
 
-                    // ── Effets par piste + metering centralisé ───────────────
+                    // ── Effets par piste + metering + sends vers bus ───────
                     for tidx in 0..64usize {
                         let (tl, tr) = track_bufs[tidx];
-                        // Appliquer la chaîne d'effets (pass-through si vide).
                         let (el, er) = state.effect_chains[tidx].process(tl, tr);
-                        // Metering après effets (uniquement pour les pistes connues).
                         if state.track_known_ids[tidx] != NO_TRACK {
                             let ea = el.abs();
                             let ea_r = er.abs();
@@ -1142,8 +1180,23 @@ impl AudioEngine {
                             state.track_rms_sum_r[tidx] += (er * er) as f64;
                             state.track_rms_count[tidx] += 1;
                         }
+                        // Send vers les bus (Phase 5.4) — post-effets, pre-master.
+                        for send in &state.sends[tidx] {
+                            if send.amount > 0.0 {
+                                if let Some(bus) = state.buses.iter_mut().find(|b| b.id == send.bus_id) {
+                                    bus.feed(el * send.amount, er * send.amount);
+                                }
+                            }
+                        }
                         left += el;
                         right += er;
+                    }
+
+                    // ── Bus d'effets : traiter et mixer (Phase 5.4) ────────
+                    for bus in &mut state.buses {
+                        let (bl, br) = bus.process();
+                        left += bl;
+                        right += br;
                     }
 
                     // Volume master.

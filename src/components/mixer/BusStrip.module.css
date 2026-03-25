@@ -1,0 +1,53 @@
+.strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  min-width: 72px;
+  background: color-mix(in srgb, #FF9800 8%, var(--color-surface-deep, #0a0a0a));
+  border: 1px solid #FF9800;
+  border-radius: 8px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.icon {
+  font-size: 14px;
+}
+
+.name {
+  font-size: 9px;
+  font-weight: 700;
+  color: #FF9800;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
+}
+
+.deleteBtn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  font-size: 9px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 3px;
+  color: var(--color-text-muted, #666);
+  cursor: pointer;
+}
+
+.deleteBtn:hover {
+  color: #f44336;
+  border-color: #f44336;
+}

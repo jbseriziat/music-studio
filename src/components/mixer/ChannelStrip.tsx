@@ -5,13 +5,15 @@ import { Knob } from '../shared/Knob';
 import { Fader } from '../shared/Fader';
 import { VuMeter } from './VuMeter';
 import { EffectRack } from '../effects/EffectRack';
-import { setTrackVolumeDb, setTrackPanCmd, setTrackMuteCmd, setTrackSoloCmd } from '../../utils/tauri-commands';
+import { setTrackVolumeDb, setTrackPanCmd, setTrackMuteCmd, setTrackSoloCmd, setSendAmount } from '../../utils/tauri-commands';
 import styles from './ChannelStrip.module.css';
+
+interface BusInfo { id: number; name: string; volume: number; }
 
 interface ChannelStripProps {
   track: Track;
-  /** Identifiant numérique de la piste (0-based pour audio/drum, ≥100 pour synth). */
   trackIndex: number;
+  buses?: BusInfo[];
   onMuteToggle: (muted: boolean) => void;
   onSoloToggle: (solo: boolean) => void;
   onVolumeChange: (volume: number) => void;
@@ -27,6 +29,7 @@ const TYPE_ICON: Record<Track['type'], string> = {
 export function ChannelStrip({
   track,
   trackIndex,
+  buses,
   onMuteToggle,
   onSoloToggle,
   onVolumeChange,
@@ -84,6 +87,25 @@ export function ChannelStrip({
       <div className={styles.effectsArea}>
         <EffectRack trackId={String(trackIndex)} />
       </div>
+
+      {/* Send knobs (Phase 5.4) */}
+      {buses && buses.length > 0 && (
+        <div className={styles.sendRow}>
+          {buses.map(bus => (
+            <Knob
+              key={bus.id}
+              label={bus.name.substring(0, 6)}
+              value={0}
+              min={0}
+              max={1}
+              defaultValue={0}
+              decimals={2}
+              size={30}
+              onChange={(v) => setSendAmount(trackIndex, bus.id, v).catch(console.error)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Panoramique */}
       <div className={styles.panRow}>

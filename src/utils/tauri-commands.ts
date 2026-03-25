@@ -604,3 +604,25 @@ export const setLimiterEnabled = (enabled: boolean): Promise<void> =>
 /** Reset le LUFS meter. */
 export const resetLufs = (): Promise<void> =>
   invoke<void>('reset_lufs');
+
+// ─── Bus d'effets Send/Return (Phase 5.4) ────────────────────────────────────
+
+/** Crée un bus d'effets. Retourne l'ID du bus. */
+export const createBus = (name: string): Promise<number> =>
+  invoke<number>('create_bus', { name });
+
+/** Supprime un bus d'effets. */
+export const deleteBus = (busId: number): Promise<void> =>
+  invoke<void>('delete_bus', { busId });
+
+/** Ajoute un effet à un bus. Retourne l'ID de l'effet. */
+export const addBusEffect = (busId: number, effectType: string): Promise<number> =>
+  invoke<number>('add_bus_effect', { busId, effectType });
+
+/** Règle le volume d'un bus (0.0–2.0). */
+export const setBusVolume = (busId: number, volume: number): Promise<void> =>
+  invoke<void>('set_bus_volume', { busId, volume });
+
+/** Règle le send amount d'une piste vers un bus (0.0–1.0). */
+export const setSendAmount = (trackId: number, busId: number, amount: number): Promise<void> =>
+  invoke<void>('set_send_amount', { trackId, busId, amount });
