@@ -346,6 +346,7 @@ mod tests {
                     color: "#fff".to_string(),
                 }],
                 track_type: Some("audio".to_string()),
+                automations: vec![],
             }],
             pads: vec![],
             drum_pattern: None,

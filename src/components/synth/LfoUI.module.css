@@ -1,0 +1,115 @@
+.lfoSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary, #aaa);
+}
+
+/* ── Waveform buttons ─────────────────────────────────────────────────────── */
+.waveformRow {
+  display: flex;
+  gap: 3px;
+}
+
+.waveBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  flex: 1;
+  padding: 4px 2px;
+  background: var(--color-surface, #1a1a1a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  color: var(--color-text-secondary, #aaa);
+}
+
+.waveBtn:hover {
+  background: var(--color-surface-hover, #252525);
+  border-color: var(--color-accent-dim, #555);
+}
+
+.waveBtn.active {
+  background: color-mix(in srgb, #FF9800 20%, transparent);
+  border-color: #FF9800;
+  color: #FF9800;
+}
+
+.waveSym {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.waveLabel {
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* ── Knobs ─────────────────────────────────────────────────────────────────── */
+.knobRow {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* ── Destination ──────────────────────────────────────────────────────────── */
+.destRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.destLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted, #666);
+}
+
+.destSelect {
+  flex: 1;
+  padding: 3px 6px;
+  font-size: 10px;
+  background: var(--color-surface, #1a1a1a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 4px;
+  color: var(--color-text, #eee);
+  cursor: pointer;
+  outline: none;
+}
+
+.destSelect:focus {
+  border-color: #FF9800;
+}
+
+/* ── Sync button ──────────────────────────────────────────────────────────── */
+.syncBtn {
+  padding: 3px 8px;
+  font-size: 10px;
+  background: var(--color-surface, #1a1a1a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 4px;
+  color: var(--color-text-muted, #666);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.syncBtn:hover {
+  border-color: var(--color-accent-dim, #555);
+}
+
+.syncActive {
+  background: color-mix(in srgb, #FF9800 20%, transparent);
+  border-color: #FF9800;
+  color: #FF9800;
+}

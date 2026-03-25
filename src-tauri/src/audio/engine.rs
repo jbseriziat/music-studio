@@ -387,6 +387,10 @@ impl AudioCallbackState {
                 // samples_per_step = SR * 60 / (bpm * 4) pour du 1/16 à 4/4
                 self.samples_per_step = (self.sample_rate as f64 * 60.0) / (self.bpm * 4.0);
                 self.bpm_atomic.store(self.bpm.to_bits(), Ordering::Relaxed);
+                // Propager le BPM aux moteurs synthé (pour le LFO sync).
+                for eng in &mut self.synth_engines {
+                    eng.bpm = self.bpm;
+                }
             }
             AudioCommand::SetDrumStep { pad, step, active, velocity } => {
                 let p = pad as usize;

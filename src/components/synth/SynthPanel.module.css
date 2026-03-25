@@ -147,6 +147,20 @@
   text-align: center;
 }
 
+/* ── Phase 5 : LFO row ───────────────────────────────────────────────────── */
+.lfoRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.lfoColumn {
+  padding: 12px;
+  background: var(--color-surface-deep, #0a0a0a);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
 /* ── Chargement ───────────────────────────────────────────────────────────── */
 .loading {
   padding: 32px;

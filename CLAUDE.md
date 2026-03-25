@@ -81,7 +81,7 @@ Les specs complètes de chaque phase sont dans le dossier `docs/` :
 IMPORTANT : avant d'implémenter une tâche, lis toujours la spec de la phase correspondante ET la spec d'architecture (Phase 0).
 
 ## Phase en cours
-Phase 3 — Mélodiste : Piano Roll + Synthétiseur + MIDI (voir @docs/SPEC_PHASE_3_MELODISTE.md)
+Phase 5 — Producteur Pro (voir @docs/SPEC_PHASE_5_PRODUCTEUR_PRO.md)
 
 ## Phase 2 — ✅ TERMINÉE
 

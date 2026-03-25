@@ -1,0 +1,50 @@
+.modeSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary, #aaa);
+}
+
+.modeButtons {
+  display: flex;
+  gap: 4px;
+}
+
+.modeBtn {
+  flex: 1;
+  padding: 5px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--color-surface, #1a1a1a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 4px;
+  color: var(--color-text-secondary, #aaa);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.modeBtn:hover {
+  background: var(--color-surface-hover, #252525);
+  border-color: var(--color-accent-dim, #555);
+}
+
+.modeBtn.active {
+  background: color-mix(in srgb, #2196F3 20%, transparent);
+  border-color: #2196F3;
+  color: #2196F3;
+}
+
+.glideRow {
+  display: flex;
+  justify-content: center;
+  padding-top: 2px;
+}
