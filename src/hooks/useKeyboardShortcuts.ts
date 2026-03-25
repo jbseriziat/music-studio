@@ -4,7 +4,7 @@ import { useTracksStore } from '../stores/tracksStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { usePianoRollStore } from '../stores/pianoRollStore';
-import { deleteClipCmd, setTrackMuteCmd, setTrackSoloCmd } from '../utils/tauri-commands';
+import { deleteClipCmd, loadSample, setTrackMuteCmd, setTrackSoloCmd } from '../utils/tauri-commands';
 
 /**
  * Hook global de raccourcis clavier (monté une seule fois dans App.tsx).
@@ -157,11 +157,44 @@ export function useKeyboardShortcuts() {
         if (currentLevel >= 4) {
           e.preventDefault();
           const t = useTransportStore.getState();
-          if (t.isRecording) {
-            const projectName = useProjectStore.getState().projectName ?? 'recording';
-            t.stopRecording(projectName).catch(() => {});
+          const { tracks, selectedTrackId } = useTracksStore.getState();
+          const projectName = useProjectStore.getState().projectName ?? 'recording';
+          // La piste armée explicitement prime sur la piste sélectionnée.
+          const armedId = t.armedTrackId ?? selectedTrackId;
+          const armedTrack = tracks.find((tr) => tr.id === armedId);
+
+          if (armedTrack?.type === 'instrument') {
+            // ── Enregistrement synthé (capture interne) ──────────────────
+            if (t.isSynthRecording) {
+              t.stopSynthRecording(projectName).then(async (wavPath) => {
+                if (!wavPath || !armedId) return;
+                try {
+                  // Charger le WAV dans la banque de samples du moteur.
+                  const sample = await loadSample(wavPath);
+                  // Créer le clip sur la piste armée en début de timeline.
+                  useTracksStore.getState().addClip({
+                    id: `clip-synth-${Date.now()}`,
+                    trackId: armedId,
+                    sampleId: String(sample.id),
+                    position: 0,
+                    duration: sample.duration_ms / 1000,
+                    color: armedTrack.color,
+                    waveformData: sample.waveform ?? [],
+                  });
+                } catch (err) {
+                  console.error('[Shortcuts] Erreur post-enregistrement synthé', err);
+                }
+              }).catch(() => {});
+            } else {
+              t.startSynthRecording(armedId ?? '').catch(() => {});
+            }
           } else {
-            t.startRecording().catch(() => {});
+            // ── Enregistrement micro (comportement original) ──────────────
+            if (t.isRecording) {
+              t.stopRecording(projectName).catch(() => {});
+            } else {
+              t.startRecording().catch(() => {});
+            }
           }
         }
         return;

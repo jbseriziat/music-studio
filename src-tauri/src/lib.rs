@@ -10,6 +10,7 @@ pub mod synth;
 pub mod transport;
 
 use audio::recorder::Recorder;
+use audio::synth_recorder::SynthRecorder;
 use audio::AudioEngine;
 use midi::MidiEngine;
 use sampler::sample_bank::{ensure_samples_exist, load_sample_bank};
@@ -50,7 +51,7 @@ use commands::midi_commands::{
 };
 use commands::recorder_commands::{
     arm_track, get_armed_track, is_recording_active, list_input_devices, set_input_device,
-    set_monitoring, start_recording, stop_recording,
+    set_monitoring, start_recording, start_synth_recording, stop_recording, stop_synth_recording,
 };
 use commands::export_commands::{export_project, get_export_path, import_audio_file};
 
@@ -113,6 +114,8 @@ pub fn run() {
             app.manage(Mutex::new(MidiEngine::new()));
             // Initialiser le recorder (enregistrement micro).
             app.manage(Mutex::new(Recorder::new()));
+            // Initialiser le SynthRecorder (enregistrement synthé, inactif par défaut).
+            app.manage(Mutex::new(Option::<SynthRecorder>::None));
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
@@ -205,6 +208,9 @@ pub fn run() {
             stop_recording,
             get_armed_track,
             is_recording_active,
+            // Enregistrement synthé (capture interne)
+            start_synth_recording,
+            stop_synth_recording,
             // Export & Import
             export_project,
             import_audio_file,

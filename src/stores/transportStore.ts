@@ -3,6 +3,8 @@ import {
   playAudio, pauseAudio, stopAudio, getPosition,
   setBpmCmd, setMetronomeCmd, setLoopCmd, setMetronomeVolumeCmd,
   startRecordingCmd, stopRecordingCmd,
+  armTrackCmd,
+  startSynthRecordingCmd, stopSynthRecordingCmd,
 } from '../utils/tauri-commands';
 
 interface TransportState {
@@ -35,6 +37,18 @@ interface TransportState {
   /** Arrête l'enregistrement et retourne le chemin WAV créé. */
   stopRecording: (projectName: string) => Promise<string>;
 
+  // ─── Enregistrement synthé ────────────────────────────────────────────────
+  /** ID de la piste actuellement armée pour l'enregistrement (null = aucune). */
+  armedTrackId: string | null;
+  /** True si un enregistrement de sortie synthé est en cours. */
+  isSynthRecording: boolean;
+  /** Arme ou désarme une piste. Synchronise aussi le côté Rust (pour l'enregistrement micro). */
+  armTrack: (trackId: string | null) => void;
+  /** Démarre la capture de la sortie du synthé de la piste armée. */
+  startSynthRecording: (trackId: string) => Promise<void>;
+  /** Arrête la capture synthé et retourne le chemin WAV créé. */
+  stopSynthRecording: (projectName: string) => Promise<string>;
+
   // ─── Setters UI ───────────────────────────────────────────────────────────
   setPlaying: (playing: boolean) => void;
   setRecording: (recording: boolean) => void;
@@ -48,6 +62,8 @@ interface TransportState {
 export const useTransportStore = create<TransportState>()((set) => ({
   isPlaying: false,
   isRecording: false,
+  armedTrackId: null,
+  isSynthRecording: false,
   position: 0,
   bpm: 120,
   loopEnabled: false,
@@ -113,6 +129,39 @@ export const useTransportStore = create<TransportState>()((set) => ({
     } catch (e) {
       console.error('[TransportStore] stopRecording error', e);
       set({ isRecording: false });
+      return '';
+    }
+  },
+
+  // ─── Enregistrement synthé ────────────────────────────────────────────────
+
+  armTrack: (trackId) => {
+    set({ armedTrackId: trackId });
+    // Synchroniser aussi le Rust (pour compatibilité avec l'enregistrement micro).
+    const numId = trackId ? Number(trackId.match(/\d+/)?.[0] ?? 0) : 0;
+    armTrackCmd(numId, trackId !== null).catch(
+      (e) => console.error('[TransportStore] armTrack error', e),
+    );
+  },
+
+  startSynthRecording: async (trackId: string) => {
+    try {
+      const numId = Number(trackId.match(/\d+/)?.[0] ?? 0);
+      await startSynthRecordingCmd(numId);
+      set({ isSynthRecording: true });
+    } catch (e) {
+      console.error('[TransportStore] startSynthRecording error', e);
+    }
+  },
+
+  stopSynthRecording: async (projectName: string) => {
+    try {
+      const wavPath = await stopSynthRecordingCmd(projectName);
+      set({ isSynthRecording: false });
+      return wavPath;
+    } catch (e) {
+      console.error('[TransportStore] stopSynthRecording error', e);
+      set({ isSynthRecording: false });
       return '';
     }
   },

@@ -476,6 +476,14 @@ export const getArmedTrack = (): Promise<number | null> =>
 export const isRecordingActive = (): Promise<boolean> =>
   invoke<boolean>('is_recording_active');
 
+/** Démarre la capture de la sortie synthé de la piste `trackId`. */
+export const startSynthRecordingCmd = (trackId: number): Promise<void> =>
+  invoke<void>('start_synth_recording', { trackId });
+
+/** Arrête la capture synthé et retourne le chemin du fichier WAV créé. */
+export const stopSynthRecordingCmd = (projectName: string): Promise<string> =>
+  invoke<string>('stop_synth_recording', { projectName });
+
 // ─── Export & Import audio ────────────────────────────────────────────────────
 
 export interface ExportOptions {
