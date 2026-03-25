@@ -2,6 +2,17 @@ use std::sync::Arc;
 
 use crate::effects::BoxedEffect;
 
+/// Wrapper autour de `ringbuf::HeapProd<f32>` implémentant `Debug` pour être
+/// utilisé dans `AudioCommand` (qui dérive `Debug`).
+/// Le champ `.0` est accédé par move dans `engine.rs::handle_command`.
+#[allow(dead_code)]
+pub struct SynthProducer(pub ringbuf::HeapProd<f32>);
+impl std::fmt::Debug for SynthProducer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SynthProducer")
+    }
+}
+
 /// Commandes envoyées depuis le thread principal vers le thread audio (canal lock-free).
 /// Les variants Arc<Vec<f32>> transfèrent la propriété via ringbuf — pas d'allocation dans le callback.
 #[derive(Debug)]
@@ -155,6 +166,20 @@ pub enum AudioCommand {
         /// Paires (beats, valeur_normalisée 0.0–1.0) triées par beats.
         points: Vec<(f64, f32)>,
     },
+
+    // ── Enregistrement du synthé (capture interne, sans micro) ───────────────
+
+    /// Envoie le producteur du ring buffer au callback pour capturer la sortie
+    /// du synthé de `track_id`. Le callback pousse des échantillons stéréo
+    /// entrelacés (L, R, L, R…) via `try_push` (lock-free, jamais bloquant).
+    SetSynthRecordProducer {
+        track_id: u32,
+        producer: SynthProducer,
+    },
+
+    /// Arrête la capture synthé : le callback drop son `HeapProd`, ce qui
+    /// ferme le ring buffer côté producteur.
+    ClearSynthRecord,
 }
 
 /// Paramètre de synthé encodé comme enum (pas de String → pas d'allocation/déallocation dans le callback).

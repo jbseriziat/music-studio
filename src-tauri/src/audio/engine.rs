@@ -253,6 +253,12 @@ struct AudioCallbackState {
     /// Panoramique automatisé : paires (beats, valeur 0.0–1.0) triées. Index = track_id % 64.
     automation_pan: Vec<Vec<(f64, f32)>>,
 
+    // ─── Enregistrement du synthé (capture lock-free) ────────────────────────
+    /// ID de la piste synthé dont on capture la sortie. `None` = pas d'enregistrement.
+    synth_record_track_id: Option<u32>,
+    /// Producteur du ring buffer vers le thread d'écriture WAV. `None` = pas d'enregistrement.
+    synth_record_producer: Option<ringbuf::HeapProd<f32>>,
+
     // ─── Atomics partagés avec le thread principal ────────────────────────────
     position_atomic: Arc<AtomicU64>,
     is_playing_atomic: Arc<AtomicBool>,
@@ -576,6 +582,17 @@ impl AudioCallbackState {
                     }
                 }
             }
+
+            // ── Enregistrement synthé (capture lock-free) ─────────────────────
+            AudioCommand::SetSynthRecordProducer { track_id, producer } => {
+                self.synth_record_track_id = Some(track_id);
+                self.synth_record_producer = Some(producer.0);
+            }
+            AudioCommand::ClearSynthRecord => {
+                self.synth_record_track_id = None;
+                // Drop du HeapProd → ferme le ring buffer côté producteur.
+                self.synth_record_producer = None;
+            }
         }
     }
 }
@@ -768,6 +785,9 @@ impl AudioEngine {
             // Automation : 64 lanes vides pré-allouées.
             automation_volume: vec![Vec::new(); 64],
             automation_pan: vec![Vec::new(); 64],
+            // Enregistrement synthé : inactif par défaut.
+            synth_record_track_id: None,
+            synth_record_producer: None,
             // Atomics
             position_atomic: position_atomic_cb,
             is_playing_atomic: is_playing_atomic_cb,
@@ -893,9 +913,20 @@ impl AudioEngine {
                             &state.automation_pan[tidx], auto_pos_beats,
                         );
                         let pan = pan_norm.map(|v| v * 2.0 - 1.0).unwrap_or(state.track_pans[tidx]);
-                        track_bufs[tidx].0 += sl * vol * pan_left(pan);
-                        track_bufs[tidx].1 += sr * vol * pan_right(pan);
+                        let out_l = sl * vol * pan_left(pan);
+                        let out_r = sr * vol * pan_right(pan);
+                        track_bufs[tidx].0 += out_l;
+                        track_bufs[tidx].1 += out_r;
                         state.track_known_ids[tidx] = track_id;
+
+                        // Capture pour l'enregistrement synthé (lock-free, try_push jamais bloquant).
+                        if state.synth_record_track_id == Some(track_id) {
+                            if let Some(ref mut prod) = state.synth_record_producer {
+                                use ringbuf::traits::Producer;
+                                let _ = prod.try_push(out_l);
+                                let _ = prod.try_push(out_r);
+                            }
+                        }
                     }
 
                     // Voix de clips (timeline).
