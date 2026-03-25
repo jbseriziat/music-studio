@@ -14,6 +14,7 @@ import { SynthPanel } from './components/synth/SynthPanel';
 import { PianoRoll } from './components/piano-roll/PianoRoll';
 import { Timeline } from './components/timeline/Timeline';
 import { Mixer } from './components/mixer/Mixer';
+import { MasteringPanel } from './components/mastering/MasteringPanel';
 import styles from './App.module.css';
 
 type InstrumentTab = 'pads' | 'drums' | 'synth';
@@ -114,6 +115,7 @@ function App() {
               />
             )}
             {mainView === 'mixer' && isVisible(4) && <Mixer />}
+            {mainView === 'mixer' && isVisible(5) && <MasteringPanel />}
           </section>
         </div>
       </AppShell>

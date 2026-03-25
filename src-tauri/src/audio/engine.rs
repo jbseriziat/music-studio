@@ -13,7 +13,7 @@ use super::commands::AudioCommand;
 use super::config::AudioConfig;
 use crate::effects::EffectChain;
 use crate::midi::MidiClip;
-use crate::mixer::{MeterReport, TrackMeterData};
+use crate::mixer::{MasterChain, MeterReport, TrackMeterData};
 use crate::synth::SynthEngine;
 use crate::transport::Metronome;
 
@@ -254,10 +254,11 @@ struct AudioCallbackState {
     automation_pan: Vec<Vec<(f64, f32)>>,
 
     // ─── Enregistrement du synthé (capture lock-free) ────────────────────────
-    /// ID de la piste synthé dont on capture la sortie. `None` = pas d'enregistrement.
     synth_record_track_id: Option<u32>,
-    /// Producteur du ring buffer vers le thread d'écriture WAV. `None` = pas d'enregistrement.
     synth_record_producer: Option<ringbuf::HeapProd<f32>>,
+
+    // ─── Master Chain (Phase 5.3) ────────────────────────────────────────────
+    master_chain: MasterChain,
 
     // ─── Atomics partagés avec le thread principal ────────────────────────────
     position_atomic: Arc<AtomicU64>,
@@ -625,6 +626,23 @@ impl AudioCallbackState {
                     self.synth_engines[slot].remove_mod_route(route_id);
                 }
             }
+
+            // ── Master Chain (Phase 5.3) ─────────────────────────────
+            AudioCommand::SetMasterChainEnabled { enabled } => {
+                self.master_chain.enabled = enabled;
+            }
+            AudioCommand::SetMasterEqBand { band, gain_db, freq, q } => {
+                self.master_chain.eq.set_band(band, gain_db, freq, q);
+            }
+            AudioCommand::SetLimiterThreshold { threshold_db } => {
+                self.master_chain.limiter.set_threshold_db(threshold_db);
+            }
+            AudioCommand::SetLimiterEnabled { enabled } => {
+                self.master_chain.limiter.enabled = enabled;
+            }
+            AudioCommand::ResetLufs => {
+                self.master_chain.lufs_meter.reset();
+            }
         }
     }
 }
@@ -820,6 +838,8 @@ impl AudioEngine {
             // Enregistrement synthé : inactif par défaut.
             synth_record_track_id: None,
             synth_record_producer: None,
+            // Master Chain (Phase 5.3)
+            master_chain: MasterChain::new(sample_rate),
             // Atomics
             position_atomic: position_atomic_cb,
             is_playing_atomic: is_playing_atomic_cb,
@@ -1126,11 +1146,14 @@ impl AudioEngine {
                         right += er;
                     }
 
-                    // Clamp + volume master.
-                    let pre_l = left * state.master_volume;
-                    let pre_r = right * state.master_volume;
+                    // Volume master.
+                    let vol_l = left * state.master_volume;
+                    let vol_r = right * state.master_volume;
 
-                    // Accumulate master meter (avant clamp).
+                    // Master Chain (EQ → Limiter, LUFS, Spectrum) — Phase 5.3.
+                    let (pre_l, pre_r) = state.master_chain.process(vol_l, vol_r);
+
+                    // Accumulate master meter (post-mastering).
                     let abs_l = pre_l.abs();
                     let abs_r = pre_r.abs();
                     if abs_l > state.master_peak_l { state.master_peak_l = abs_l; }
@@ -1169,6 +1192,13 @@ impl AudioEngine {
                                 state.track_rms_sum_r[i] = 0.0;
                                 state.track_rms_count[i] = 0;
                             }
+                            // Mastering data (Phase 5.3)
+                            report.lufs_momentary = state.master_chain.lufs_meter.get_momentary();
+                            report.lufs_shortterm = state.master_chain.lufs_meter.get_shortterm();
+                            report.lufs_integrated = state.master_chain.lufs_meter.get_integrated();
+                            report.true_peak_db = state.master_chain.lufs_meter.get_true_peak_db();
+                            report.limiter_gr_db = state.master_chain.limiter.gain_reduction_db();
+                            report.spectrum = state.master_chain.spectrum.bins.to_vec();
                         }
                         // Reset accumulateurs master (même si try_lock a échoué)
                         state.master_peak_l = 0.0;

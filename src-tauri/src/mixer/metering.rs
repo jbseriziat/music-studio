@@ -69,4 +69,23 @@ pub struct TrackMeterData {
 pub struct MeterReport {
     pub tracks: Vec<TrackMeterData>,
     pub master: MeterData,
+    // ── Mastering (Phase 5.3) ──────────────────────────────────────
+    /// LUFS momentary (400ms).
+    #[serde(default)]
+    pub lufs_momentary: f32,
+    /// LUFS short-term (3s).
+    #[serde(default)]
+    pub lufs_shortterm: f32,
+    /// LUFS integrated (tout le morceau).
+    #[serde(default)]
+    pub lufs_integrated: f32,
+    /// True peak en dBFS.
+    #[serde(default)]
+    pub true_peak_db: f32,
+    /// Gain reduction du limiteur en dB (≥ 0).
+    #[serde(default)]
+    pub limiter_gr_db: f32,
+    /// Spectre FFT (64 bins, magnitude en dB).
+    #[serde(default)]
+    pub spectrum: Vec<f32>,
 }

@@ -2,6 +2,7 @@ pub mod compressor;
 pub mod delay;
 pub mod effect_chain;
 pub mod eq;
+pub mod limiter;
 pub mod reverb;
 
 pub use effect_chain::EffectChain;

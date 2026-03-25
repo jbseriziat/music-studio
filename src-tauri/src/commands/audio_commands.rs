@@ -426,3 +426,64 @@ pub fn remove_modulation_route(
     );
     Ok(())
 }
+
+// ── Master Chain (Phase 5.3) ──────────────────────────────────────────────────
+
+/// Active/désactive la chaîne de mastering.
+#[tauri::command]
+pub fn set_master_chain_enabled(
+    enabled: bool,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetMasterChainEnabled { enabled },
+    );
+    Ok(())
+}
+
+/// Règle une bande de l'EQ master (0–4). gain_db : -12 à +12, freq : 20–20000, q : 0.1–10.
+#[tauri::command]
+pub fn set_master_eq_band(
+    band: u8,
+    gain_db: f32,
+    freq: f32,
+    q: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    if band >= 5 { return Err("Band index 0–4".to_string()); }
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetMasterEqBand { band, gain_db, freq, q },
+    );
+    Ok(())
+}
+
+/// Règle le threshold du limiteur brickwall (en dB, -12 à 0).
+#[tauri::command]
+pub fn set_limiter_threshold(
+    threshold_db: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetLimiterThreshold { threshold_db },
+    );
+    Ok(())
+}
+
+/// Active/désactive le limiteur.
+#[tauri::command]
+pub fn set_limiter_enabled(
+    enabled: bool,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetLimiterEnabled { enabled },
+    );
+    Ok(())
+}
+
+/// Reset le LUFS meter (nouveau morceau / repositionnement).
+#[tauri::command]
+pub fn reset_lufs(engine: State<Mutex<AudioEngine>>) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(AudioCommand::ResetLufs);
+    Ok(())
+}

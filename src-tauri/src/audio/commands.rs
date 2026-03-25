@@ -197,6 +197,23 @@ pub enum AudioCommand {
 
     /// Supprime un routage de modulation.
     RemoveModRoute { track_id: u32, route_id: u32 },
+
+    // ── Master Chain (Phase 5.3) ─────────────────────────────────────────────
+
+    /// Active/désactive la chaîne de mastering.
+    SetMasterChainEnabled { enabled: bool },
+
+    /// Règle une bande de l'EQ master (0–4).
+    SetMasterEqBand { band: u8, gain_db: f32, freq: f32, q: f32 },
+
+    /// Règle le threshold du limiteur (en dB, -12 à 0).
+    SetLimiterThreshold { threshold_db: f32 },
+
+    /// Active/désactive le limiteur.
+    SetLimiterEnabled { enabled: bool },
+
+    /// Reset le LUFS meter (nouveau morceau / repositionnement).
+    ResetLufs,
 }
 
 /// Paramètre de synthé encodé comme enum (pas de String → pas d'allocation/déallocation dans le callback).

@@ -580,3 +580,27 @@ export const removeModulationRoute = (
   routeId: number,
 ): Promise<void> =>
   invoke<void>('remove_modulation_route', { trackId, routeId });
+
+// ─── Master Chain / Mastering (Phase 5.3) ────────────────────────────────────
+
+/** Active/désactive la chaîne de mastering. */
+export const setMasterChainEnabled = (enabled: boolean): Promise<void> =>
+  invoke<void>('set_master_chain_enabled', { enabled });
+
+/** Règle une bande de l'EQ master (0–4). */
+export const setMasterEqBand = (
+  band: number, gainDb: number, freq: number, q: number,
+): Promise<void> =>
+  invoke<void>('set_master_eq_band', { band, gainDb, freq, q });
+
+/** Règle le threshold du limiteur (-12 à 0 dB). */
+export const setLimiterThreshold = (thresholdDb: number): Promise<void> =>
+  invoke<void>('set_limiter_threshold', { thresholdDb });
+
+/** Active/désactive le limiteur. */
+export const setLimiterEnabled = (enabled: boolean): Promise<void> =>
+  invoke<void>('set_limiter_enabled', { enabled });
+
+/** Reset le LUFS meter. */
+export const resetLufs = (): Promise<void> =>
+  invoke<void>('reset_lufs');
