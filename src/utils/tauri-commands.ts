@@ -554,3 +554,29 @@ export const getAutomationLane = (
 /** Efface toutes les lanes d'automation d'une piste (chargement de projet). */
 export const clearTrackAutomation = (trackId: number): Promise<void> =>
   invoke<void>('clear_track_automation', { trackId });
+
+// ─── Matrice de modulation (Phase 5.2) ───────────────────────────────────────
+
+/** Ajoute un routage de modulation. source/destination sont des index numériques. Retourne l'ID. */
+export const addModulationRoute = (
+  trackId: number,
+  source: number,
+  destination: number,
+  amount: number,
+): Promise<number> =>
+  invoke<number>('add_modulation_route', { trackId, source, destination, amount });
+
+/** Met à jour l'intensité d'un routage existant. */
+export const updateModulationRoute = (
+  trackId: number,
+  routeId: number,
+  amount: number,
+): Promise<void> =>
+  invoke<void>('update_modulation_route', { trackId, routeId, amount });
+
+/** Supprime un routage de modulation. */
+export const removeModulationRoute = (
+  trackId: number,
+  routeId: number,
+): Promise<void> =>
+  invoke<void>('remove_modulation_route', { trackId, routeId });

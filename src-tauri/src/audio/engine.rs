@@ -594,8 +594,36 @@ impl AudioCallbackState {
             }
             AudioCommand::ClearSynthRecord => {
                 self.synth_record_track_id = None;
-                // Drop du HeapProd → ferme le ring buffer côté producteur.
                 self.synth_record_producer = None;
+            }
+
+            // ── Matrice de modulation (Phase 5.2) ───────────────────────
+            AudioCommand::AddModRoute { track_id, route_id, source, destination, amount } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    use crate::synth::lfo::{ModSource, ModDestination, ModRoute};
+                    let src = ModSource::from_index(source);
+                    let dest = ModDestination::from_str(match destination {
+                        0 => "pitch", 1 => "cutoff", 2 => "volume",
+                        3 => "pan", 4 => "osc2pitch", 5 => "resonance",
+                        _ => "pitch",
+                    }).unwrap_or(ModDestination::Pitch);
+                    self.synth_engines[slot].mod_routes.push(ModRoute {
+                        id: route_id,
+                        source: src,
+                        destination: dest,
+                        amount: amount.clamp(-1.0, 1.0),
+                    });
+                }
+            }
+            AudioCommand::UpdateModRoute { track_id, route_id, amount } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    self.synth_engines[slot].update_mod_route(route_id, amount);
+                }
+            }
+            AudioCommand::RemoveModRoute { track_id, route_id } => {
+                if let Some(slot) = self.synth_track_ids.iter().position(|&id| id == track_id) {
+                    self.synth_engines[slot].remove_mod_route(route_id);
+                }
             }
         }
     }

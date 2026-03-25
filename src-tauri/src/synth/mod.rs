@@ -5,7 +5,7 @@ pub mod oscillator;
 pub mod synth_engine;
 pub mod voice;
 
-pub use lfo::{LfoWaveform, ModDestination, LFO};
+pub use lfo::{LfoWaveform, ModDestination, ModRoute, ModSource, LFO};
 pub use synth_engine::{midi_note_to_freq, SynthEngine, SynthMode};
 
 use oscillator::Waveform;

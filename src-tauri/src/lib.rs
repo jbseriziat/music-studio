@@ -18,11 +18,12 @@ use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
 use commands::audio_commands::{
-    add_clip, add_effect, clear_timeline, delete_clip, get_compressor_gain_reduction,
-    get_effect_params, move_clip, pause, ping_audio, play, remove_effect,
-    set_drum_rack_track_id, set_effect_bypass, set_effect_param, set_loop, set_master_volume,
-    set_metronome_volume, set_position, set_track_mute, set_track_pan_cmd, set_track_solo,
-    set_track_volume_db, stop,
+    add_clip, add_effect, add_modulation_route, clear_timeline, delete_clip,
+    get_compressor_gain_reduction, get_effect_params, move_clip, pause, ping_audio, play,
+    remove_effect, remove_modulation_route, set_drum_rack_track_id, set_effect_bypass,
+    set_effect_param, set_loop, set_master_volume, set_metronome_volume, set_position,
+    set_track_mute, set_track_pan_cmd, set_track_solo, set_track_volume_db, stop,
+    update_modulation_route,
 };
 use commands::automation_commands::{
     add_automation_point, clear_track_automation, delete_automation_point,
@@ -148,6 +149,10 @@ pub fn run() {
             set_effect_bypass,
             get_effect_params,
             get_compressor_gain_reduction,
+            // Mod matrix (Phase 5.2)
+            add_modulation_route,
+            update_modulation_route,
+            remove_modulation_route,
             // Samples & pads
             trigger_pad,
             assign_pad_sample,

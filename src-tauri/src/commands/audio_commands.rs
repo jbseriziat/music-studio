@@ -378,3 +378,51 @@ pub fn get_compressor_gain_reduction(
         None => Ok(0.0),
     }
 }
+
+// ── Matrice de modulation (Phase 5.2) ─────────────────────────────────────────
+
+/// Compteur global d'ID de routages de modulation.
+static MOD_ROUTE_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+/// Ajoute un routage de modulation au synthé d'une piste. Retourne l'ID du routage.
+#[tauri::command]
+pub fn add_modulation_route(
+    track_id: u32,
+    source: u32,
+    destination: u32,
+    amount: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<u32, String> {
+    let route_id = MOD_ROUTE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::AddModRoute { track_id, route_id, source, destination, amount },
+    );
+    Ok(route_id)
+}
+
+/// Met à jour l'intensité d'un routage existant.
+#[tauri::command]
+pub fn update_modulation_route(
+    track_id: u32,
+    route_id: u32,
+    amount: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::UpdateModRoute { track_id, route_id, amount },
+    );
+    Ok(())
+}
+
+/// Supprime un routage de modulation.
+#[tauri::command]
+pub fn remove_modulation_route(
+    track_id: u32,
+    route_id: u32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::RemoveModRoute { track_id, route_id },
+    );
+    Ok(())
+}

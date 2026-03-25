@@ -180,6 +180,23 @@ pub enum AudioCommand {
     /// Arrête la capture synthé : le callback drop son `HeapProd`, ce qui
     /// ferme le ring buffer côté producteur.
     ClearSynthRecord,
+
+    // ── Matrice de modulation (Phase 5.2) ────────────────────────────────────
+
+    /// Ajoute un routage de modulation au synthé d'une piste.
+    AddModRoute {
+        track_id: u32,
+        route_id: u32,
+        source: u32,      // ModSource index
+        destination: u32,  // ModDestination index
+        amount: f32,
+    },
+
+    /// Met à jour l'intensité d'un routage existant.
+    UpdateModRoute { track_id: u32, route_id: u32, amount: f32 },
+
+    /// Supprime un routage de modulation.
+    RemoveModRoute { track_id: u32, route_id: u32 },
 }
 
 /// Paramètre de synthé encodé comme enum (pas de String → pas d'allocation/déallocation dans le callback).
@@ -214,6 +231,14 @@ pub enum SynthParam {
     Lfo2Sync,
     SynthMode,
     GlideTime,
+    // ── Phase 5.2 ───────────────────────────────────────────────────
+    FilterType,
+    Drive,
+    FilterEnvAmount,
+    FilterEnvAttack,
+    FilterEnvDecay,
+    FilterEnvSustain,
+    FilterEnvRelease,
 }
 
 impl SynthParam {
@@ -246,6 +271,13 @@ impl SynthParam {
             "lfo2_sync"        => Some(Self::Lfo2Sync),
             "synth_mode"       => Some(Self::SynthMode),
             "glide_time"       => Some(Self::GlideTime),
+            "filter_type"      => Some(Self::FilterType),
+            "drive"            => Some(Self::Drive),
+            "filter_env_amount"  => Some(Self::FilterEnvAmount),
+            "filter_env_attack"  => Some(Self::FilterEnvAttack),
+            "filter_env_decay"   => Some(Self::FilterEnvDecay),
+            "filter_env_sustain" => Some(Self::FilterEnvSustain),
+            "filter_env_release" => Some(Self::FilterEnvRelease),
             _                  => None,
         }
     }
@@ -279,6 +311,13 @@ impl SynthParam {
             Self::Lfo2Sync         => "lfo2_sync",
             Self::SynthMode        => "synth_mode",
             Self::GlideTime        => "glide_time",
+            Self::FilterType       => "filter_type",
+            Self::Drive            => "drive",
+            Self::FilterEnvAmount  => "filter_env_amount",
+            Self::FilterEnvAttack  => "filter_env_attack",
+            Self::FilterEnvDecay   => "filter_env_decay",
+            Self::FilterEnvSustain => "filter_env_sustain",
+            Self::FilterEnvRelease => "filter_env_release",
         }
     }
 }

@@ -8,6 +8,8 @@ import { FilterUI } from './FilterUI';
 import { PresetSelector } from './PresetSelector';
 import { LfoUI } from './LfoUI';
 import { SynthModeUI } from './SynthModeUI';
+import { FilterEnvelopeUI } from './FilterEnvelopeUI';
+import { ModMatrixUI } from './ModMatrixUI';
 import { Knob } from '../shared/Knob';
 import { VirtualKeyboard } from '../piano-roll/VirtualKeyboard';
 import { useSynthStore } from '../../stores/synthStore';
@@ -86,9 +88,12 @@ export function SynthPanel() {
             </LevelGate>
           </div>
 
-          {/* Colonne droite : Filtre + Volume */}
+          {/* Colonne droite : Filtre + Filter Env (Phase 5) + Volume */}
           <div className={styles.column}>
             <FilterUI />
+            <LevelGate level={5}>
+              <FilterEnvelopeUI />
+            </LevelGate>
             <div className={styles.volumeRow}>
               <Knob
                 label="Volume"
@@ -104,7 +109,7 @@ export function SynthPanel() {
           </div>
         </div>
 
-        {/* Phase 5 : LFO section */}
+        {/* Phase 5 : LFO + Mod Matrix section */}
         <LevelGate level={5}>
           <div className={styles.lfoRow}>
             <div className={styles.lfoColumn}>
@@ -113,6 +118,9 @@ export function SynthPanel() {
             <div className={styles.lfoColumn}>
               <LfoUI index={2} />
             </div>
+          </div>
+          <div className={styles.modMatrixWrapper}>
+            <ModMatrixUI />
           </div>
         </LevelGate>
 

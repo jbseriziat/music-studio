@@ -1,5 +1,57 @@
 use serde::{Deserialize, Serialize};
 
+// ── Modulation Matrix ────────────────────────────────────────────────────────
+
+/// Source de modulation dans la matrice.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum ModSource {
+    Envelope1,   // Enveloppe d'amplitude
+    Envelope2,   // Enveloppe de filtre
+    LFO1,
+    LFO2,
+    Velocity,    // Vélocité de la note (0.0–1.0)
+    NoteNumber,  // Numéro de note normalisé (0.0–1.0 sur 0–127)
+}
+
+impl Default for ModSource {
+    fn default() -> Self { ModSource::LFO1 }
+}
+
+impl ModSource {
+    pub fn from_index(i: u32) -> Self {
+        match i {
+            0 => Self::Envelope1,
+            1 => Self::Envelope2,
+            2 => Self::LFO1,
+            3 => Self::LFO2,
+            4 => Self::Velocity,
+            5 => Self::NoteNumber,
+            _ => Self::LFO1,
+        }
+    }
+
+    pub fn to_index(self) -> u32 {
+        match self {
+            Self::Envelope1 => 0,
+            Self::Envelope2 => 1,
+            Self::LFO1 => 2,
+            Self::LFO2 => 3,
+            Self::Velocity => 4,
+            Self::NoteNumber => 5,
+        }
+    }
+}
+
+/// Un routage dans la matrice de modulation.
+#[derive(Debug, Clone)]
+pub struct ModRoute {
+    pub id: u32,
+    pub source: ModSource,
+    pub destination: ModDestination,
+    /// Intensité de modulation (-1.0 à +1.0).
+    pub amount: f32,
+}
+
 /// Destination de modulation du LFO.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ModDestination {

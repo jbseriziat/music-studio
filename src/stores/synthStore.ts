@@ -49,7 +49,18 @@ export interface SynthParams {
   lfo2_sync: boolean;
   synth_mode: SynthModeType;
   glide_time: number;  // ms
+  // ── Phase 5.2 ────────────────────────────
+  filter_type: number;        // 0=LP12, 1=LP24, 2=HP, 3=BP, 4=Notch
+  drive: number;              // 0.0–1.0
+  filter_env_amount: number;  // 0.0–1.0
+  filter_env_attack: number;
+  filter_env_decay: number;
+  filter_env_sustain: number;
+  filter_env_release: number;
 }
+
+export type FilterTypeName = 'LP12' | 'LP24' | 'HP' | 'BP' | 'Notch';
+export type ModSourceName = 'Envelope1' | 'Envelope2' | 'LFO1' | 'LFO2' | 'Velocity' | 'NoteNumber';
 
 interface SynthStore {
   /** Track ID Rust (≥ 100). null = pas encore initialisé. */
@@ -101,6 +112,13 @@ const DEFAULT_PARAMS: SynthParams = {
   lfo2_sync: false,
   synth_mode: 'poly',
   glide_time: 0,
+  filter_type: 0,
+  drive: 0,
+  filter_env_amount: 0,
+  filter_env_attack: 0.005,
+  filter_env_decay: 0.200,
+  filter_env_sustain: 0.0,
+  filter_env_release: 0.300,
 };
 
 // Correspondance waveform → valeur numérique pour le backend Rust
