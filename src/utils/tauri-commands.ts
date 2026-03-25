@@ -224,6 +224,25 @@ export const getProjectPath = (name: string): Promise<string> =>
 export const deleteProjectFile = (path: string): Promise<void> =>
   invoke<void>('delete_project', { path });
 
+// ─── Templates (Phase 5.6) ───────────────────────────────────────────────────
+
+export interface TemplateInfoDto {
+  name: string;
+  path: string;
+}
+
+/** Sauvegarde la config actuelle comme template. */
+export const saveAsTemplate = (name: string, project: MspProject): Promise<void> =>
+  invoke<void>('save_as_template', { name, project });
+
+/** Liste les templates disponibles (prédéfinis + utilisateur). */
+export const listTemplatesCmd = (): Promise<TemplateInfoDto[]> =>
+  invoke<TemplateInfoDto[]>('list_templates');
+
+/** Charge un template par nom et retourne un MspProject pré-configuré. */
+export const loadTemplateCmd = (name: string): Promise<MspProject> =>
+  invoke<MspProject>('load_template', { name });
+
 // ─── Drum Rack & Séquenceur ───────────────────────────────────────────────────
 
 export interface DrumPatternDto {

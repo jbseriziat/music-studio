@@ -38,8 +38,8 @@ use commands::drum_commands::{
     set_metronome, trigger_drum_pad,
 };
 use commands::project_commands::{
-    delete_project, get_project_path, get_projects_dir, list_projects, load_project, new_project,
-    save_project,
+    delete_project, get_project_path, get_projects_dir, list_projects, list_templates,
+    load_project, load_template, new_project, save_as_template, save_project,
 };
 use commands::sample_commands::{
     assign_pad_sample, get_pad_config, get_position, list_samples, load_sample, preview_sample,
@@ -223,6 +223,10 @@ pub fn run() {
             get_projects_dir,
             get_project_path,
             delete_project,
+            // Templates (Phase 5.6)
+            save_as_template,
+            list_templates,
+            load_template,
             // Enregistrement
             list_input_devices,
             set_input_device,

@@ -83,6 +83,31 @@ IMPORTANT : avant d'implémenter une tâche, lis toujours la spec de la phase co
 ## Phase en cours
 Phase 5 — Producteur Pro (voir @docs/SPEC_PHASE_5_PRODUCTEUR_PRO.md)
 
+## Phase 5 — EN COURS
+
+Étapes réalisées :
+1. ✅ Prompt 5.1 — Double oscillateur, LFO×2, Noise/PWM, Mono/Legato/Glide, 10 presets
+2. ✅ Prompt 5.2 — Matrice de modulation (ModRoute/ModSource, max 8), enveloppe filtre, filtres avancés (LP24/HP/BP/Notch/Drive)
+3. ✅ Prompt 5.3 — Mastering : EQ master 5 bandes, limiteur brickwall, LUFS meter (K-weighting), spectre FFT 64 bins
+4. ✅ Prompt 5.4 — Bus d'effets send/return (max 4 bus, 2 par défaut : Reverb + Delay)
+5. ✅ Prompt 5.5 — Sidechain compression, automation Bézier (Linear/EaseIn/EaseOut/SCurve), groupes de pistes
+6. ✅ Prompt 5.6 — Templates de projet (3 prédéfinis + utilisateur), commandes Tauri
+
+Notes d'implémentation Phase 5 :
+- SynthEngine : voices[8], lfo1/lfo2 (LFO), mod_routes Vec<ModRoute>, mode SynthMode, glide_coeff
+- SynthVoice : osc1 + osc2 (Oscillator), filter_envelope (Envelope), filter_env_amount, base_cutoff
+- Oscillator : Noise (xorshift32), PulseWidth (duty cycle), glide (target_frequency + coeff exp)
+- LFO : LfoWaveform (Sine/Square/Triangle/Saw/S&H), ModDestination, sync_to_bpm, process(sr, bpm) -> f32
+- ModRoute : ModSource (Env1/2, LFO1/2, Velocity, NoteNumber) → ModDestination → amount ±1.0
+- Filter : FilterType::LowPass24 = cascade 2 biquads, drive = soft_clip(tanh), Notch biquad
+- MasterChain (mixer/master.rs) : MasterEq (5 bandes shelf/peak) → BrickwallLimiter → LufsMeter + SpectrumAnalyzer
+- LufsMeter : K-weighting ITU-R BS.1770 (2 biquads, coeffs 48kHz/44.1kHz), 3 fenêtres (400ms/3s/intégré)
+- EffectBus (mixer/bus.rs) : accum stéréo + EffectChain + volume, MAX_BUSES=4, sends[64]
+- Sidechain : Compressor.sidechain_source, inject_sidechain_levels(pre_fx_peaks[64])
+- Automation Bézier : CurveType (Linear/EaseIn/EaseOut/SCurve), get_auto_value_curved()
+- TrackGroup : id, track_ids, volume multiplicateur appliqué dans le callback
+- Templates : ~/MusicStudio/Templates/*.mst, 3 prédéfinis (Beat Making, Song Writing, Sound Design)
+
 ## Phase 2 — ✅ TERMINÉE
 
 Étapes réalisées :
