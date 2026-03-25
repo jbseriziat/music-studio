@@ -139,6 +139,15 @@ struct TimelineClip {
     track_id: u32,
 }
 
+// ─── Groupe de pistes (Phase 5.5) ────────────────────────────────────────────
+struct TrackGroup {
+    id: u32,
+    /// Track IDs (% 64) dans le groupe.
+    track_ids: Vec<u32>,
+    /// Volume multiplicateur du groupe (1.0 = nominal).
+    volume: f32,
+}
+
 // ─── État du callback audio ───────────────────────────────────────────────────
 struct AudioCallbackState {
     master_volume: f32,
@@ -261,6 +270,9 @@ struct AudioCallbackState {
     buses: Vec<crate::mixer::EffectBus>,
     /// Sends par piste : sends[track_id % 64] = Vec<Send>.
     sends: Vec<Vec<crate::mixer::Send>>,
+
+    // ─── Track Groups (Phase 5.5) ──────────────────────────────────────────────
+    track_groups: Vec<TrackGroup>,
 
     // ─── Master Chain (Phase 5.3) ────────────────────────────────────────────
     master_chain: MasterChain,
@@ -680,6 +692,19 @@ impl AudioCallbackState {
                     self.sends[tidx].push(crate::mixer::Send { bus_id, amount: amount.clamp(0.0, 1.0) });
                 }
             }
+
+            // ── Track Groups (Phase 5.5) ─────────────────────────────
+            AudioCommand::CreateTrackGroup { group_id, track_ids } => {
+                self.track_groups.push(TrackGroup { id: group_id, track_ids, volume: 1.0 });
+            }
+            AudioCommand::DissolveTrackGroup { group_id } => {
+                self.track_groups.retain(|g| g.id != group_id);
+            }
+            AudioCommand::SetGroupVolume { group_id, volume } => {
+                if let Some(g) = self.track_groups.iter_mut().find(|g| g.id == group_id) {
+                    g.volume = volume.clamp(0.0, 4.0);
+                }
+            }
         }
     }
 }
@@ -878,6 +903,8 @@ impl AudioEngine {
             // Bus d'effets (Phase 5.4)
             buses: Vec::with_capacity(crate::mixer::MAX_BUSES),
             sends: vec![Vec::new(); 64],
+            // Track Groups (Phase 5.5)
+            track_groups: Vec::with_capacity(8),
             // Master Chain (Phase 5.3)
             master_chain: MasterChain::new(sample_rate),
             // Atomics
@@ -1165,6 +1192,27 @@ impl AudioEngine {
                         if state.position_frames % 512 == 0 {
                             state.position_atomic.store(state.position_frames, Ordering::Relaxed);
                         }
+                    }
+
+                    // ── Appliquer le volume des groupes de pistes (Phase 5.5) ─
+                    for group in &state.track_groups {
+                        for &tid in &group.track_ids {
+                            let tidx = (tid % 64) as usize;
+                            track_bufs[tidx].0 *= group.volume;
+                            track_bufs[tidx].1 *= group.volume;
+                        }
+                    }
+
+                    // ── Sidechain : stocker le niveau pré-effet par piste (Phase 5.5) ─
+                    let mut pre_fx_peaks = [0.0f32; 64];
+                    for tidx in 0..64usize {
+                        let (tl, tr) = track_bufs[tidx];
+                        pre_fx_peaks[tidx] = tl.abs().max(tr.abs());
+                    }
+
+                    // ── Injecter les niveaux sidechain dans les compresseurs ──
+                    for tidx in 0..64usize {
+                        state.effect_chains[tidx].inject_sidechain_levels(&pre_fx_peaks);
                     }
 
                     // ── Effets par piste + metering + sends vers bus ───────

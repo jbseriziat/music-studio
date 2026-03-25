@@ -559,3 +559,45 @@ pub fn set_send_amount(
     );
     Ok(())
 }
+
+// ── Track Groups (Phase 5.5) ──────────────────────────────────────────────────
+
+static GROUP_ID_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+/// Crée un groupe de pistes. Retourne l'ID du groupe.
+#[tauri::command]
+pub fn create_track_group(
+    track_ids: Vec<u32>,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<u32, String> {
+    let group_id = GROUP_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::CreateTrackGroup { group_id, track_ids },
+    );
+    Ok(group_id)
+}
+
+/// Dissout un groupe de pistes.
+#[tauri::command]
+pub fn dissolve_track_group(
+    group_id: u32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::DissolveTrackGroup { group_id },
+    );
+    Ok(())
+}
+
+/// Règle le volume d'un groupe (multiplicateur, 0.0–4.0).
+#[tauri::command]
+pub fn set_group_volume(
+    group_id: u32,
+    volume: f32,
+    engine: State<Mutex<AudioEngine>>,
+) -> Result<(), String> {
+    engine.inner().lock().map_err(|e| e.to_string())?.send_command(
+        AudioCommand::SetGroupVolume { group_id, volume },
+    );
+    Ok(())
+}

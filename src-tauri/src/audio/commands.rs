@@ -231,6 +231,17 @@ pub enum AudioCommand {
 
     /// Règle le send amount d'une piste vers un bus.
     SetSendAmount { track_id: u32, bus_id: u32, amount: f32 },
+
+    // ── Track Groups (Phase 5.5) ─────────────────────────────────────────────
+
+    /// Crée un groupe de pistes.
+    CreateTrackGroup { group_id: u32, track_ids: Vec<u32> },
+
+    /// Supprime (dissout) un groupe.
+    DissolveTrackGroup { group_id: u32 },
+
+    /// Règle le volume du groupe (multiplicateur appliqué à toutes les pistes enfants).
+    SetGroupVolume { group_id: u32, volume: f32 },
 }
 
 /// Paramètre de synthé encodé comme enum (pas de String → pas d'allocation/déallocation dans le callback).

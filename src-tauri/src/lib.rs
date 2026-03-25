@@ -19,9 +19,10 @@ use tauri::{Emitter, Manager};
 
 use commands::audio_commands::{
     add_bus_effect, add_clip, add_effect, add_modulation_route, clear_timeline, create_bus,
-    delete_bus, delete_clip, get_compressor_gain_reduction, get_effect_params, move_clip,
-    pause, ping_audio, play, remove_effect, remove_modulation_route, reset_lufs,
-    set_bus_volume, set_drum_rack_track_id, set_effect_bypass, set_effect_param,
+    create_track_group, delete_bus, delete_clip, dissolve_track_group,
+    get_compressor_gain_reduction, get_effect_params, move_clip, pause, ping_audio, play,
+    remove_effect, remove_modulation_route, reset_lufs, set_bus_volume,
+    set_drum_rack_track_id, set_effect_bypass, set_effect_param, set_group_volume,
     set_limiter_enabled, set_limiter_threshold, set_loop, set_master_chain_enabled,
     set_master_eq_band, set_master_volume, set_metronome_volume, set_position,
     set_send_amount, set_track_mute, set_track_pan_cmd, set_track_solo, set_track_volume_db,
@@ -167,6 +168,10 @@ pub fn run() {
             add_bus_effect,
             set_bus_volume,
             set_send_amount,
+            // Track Groups (Phase 5.5)
+            create_track_group,
+            dissolve_track_group,
+            set_group_volume,
             // Samples & pads
             trigger_pad,
             assign_pad_sample,

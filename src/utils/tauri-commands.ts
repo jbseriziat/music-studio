@@ -626,3 +626,17 @@ export const setBusVolume = (busId: number, volume: number): Promise<void> =>
 /** Règle le send amount d'une piste vers un bus (0.0–1.0). */
 export const setSendAmount = (trackId: number, busId: number, amount: number): Promise<void> =>
   invoke<void>('set_send_amount', { trackId, busId, amount });
+
+// ─── Track Groups (Phase 5.5) ────────────────────────────────────────────────
+
+/** Crée un groupe de pistes. Retourne l'ID du groupe. */
+export const createTrackGroup = (trackIds: number[]): Promise<number> =>
+  invoke<number>('create_track_group', { trackIds });
+
+/** Dissout un groupe de pistes. */
+export const dissolveTrackGroup = (groupId: number): Promise<void> =>
+  invoke<void>('dissolve_track_group', { groupId });
+
+/** Règle le volume d'un groupe (multiplicateur). */
+export const setGroupVolume = (groupId: number, volume: number): Promise<void> =>
+  invoke<void>('set_group_volume', { groupId, volume });
